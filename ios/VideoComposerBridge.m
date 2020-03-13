@@ -7,6 +7,6 @@
   return NO;
 }
 
-RCT_EXTERN_METHOD(compose:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(compose:(NSString)one url:(NSString)two (RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 
 @end

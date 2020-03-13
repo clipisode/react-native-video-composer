@@ -4,7 +4,7 @@ class VideoComposer: NSObject {
   }
   
   @objc
-  func compose(resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
-    resolve();
+  func compose(_ one: String, url two: String, resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+    resolve("Hello");
   }
 }

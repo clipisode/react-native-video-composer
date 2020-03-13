@@ -60,7 +60,7 @@ def configureReactNativePom(def pom) {
         name packageJson.title
         artifactId packageJson.name
         version = packageJson.version
-        group = "me.maxschmeling.reactnativecreativekit"
+        group = "com.clipisode.reactnativevideocomposer"
         description packageJson.description
         url packageJson.repository.baseUrl
 
