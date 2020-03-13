@@ -19,7 +19,7 @@ else
 end
 
 Pod::Spec.new do |s|
-  s.name                   = "ReactNativeCreativeKit"
+  s.name                   = "ReactNativeVideoComposer"
   s.version                = version
   s.summary                = package["description"]
   s.homepage               = "https://clipisode.github.io/react-native-video-composer"

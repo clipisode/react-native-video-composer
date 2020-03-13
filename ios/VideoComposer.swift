@@ -5,6 +5,6 @@ class VideoComposer: NSObject {
   
   @objc
   func compose(resolver resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
-   
+    resolve();
   }
 }

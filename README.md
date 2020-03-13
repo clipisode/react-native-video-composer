@@ -1,2 +1,2 @@
-# react-native-creativekit
-Share with Snapchat in ReactNative (iOS and Android).
+# @clipisode/react-native-video-composer
+A react-native library for comopsing videos.
