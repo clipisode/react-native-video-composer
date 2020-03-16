@@ -2,6 +2,11 @@ import { NativeModules } from "react-native";
 
 const { VideoComposer } = NativeModules;
 
-export function compose(one: string, two: string): Promise<string> {
-  return VideoComposer.compose(one, two);
+type Composition = {
+  duration: number;
+  videos: Array<{ path: string; startAt: number }>
+};
+
+export function compose(composition: Composition, output: string): Promise<string> {
+  return VideoComposer.compose(composition, output);
 }

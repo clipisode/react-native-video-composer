@@ -1,12 +1,14 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "lib": ["es2017"],
+    "lib": ["es2015", "es2016", "es2017", "esnext"],
     "module": "commonjs",
+    "moduleResolution": "node",
     "declaration": true,
     "outDir": "./lib",
-    "strict": true
+    "strict": true,
+    "jsx": "react-native"
   },
-  "include": ["src"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "**/__tests__/*"]
 }
