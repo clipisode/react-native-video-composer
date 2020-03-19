@@ -1,4 +1,6 @@
-import { NativeModules } from "react-native";
+import { NativeModules, DeviceEventEmitter } from "react-native";
+
+const { VideoComposer } = NativeModules;
 
 type Options = {
   composition: {
@@ -10,20 +12,24 @@ type Options = {
   onProgress?: (progress: number) => void
 }
 
-export function compose({composition, exportId, output}:Options): Promise<string> {
-  const { VideoComposer } = NativeModules;
+const eventPrefix = '@clipisode/react-native-video-composer';
 
+VideoComposer.addListener(`${eventPrefix}:progress`);
+
+export function compose({composition, exportId, output}:Options): Promise<string> {
   return VideoComposer.compose(composition, exportId, output);
 }
 
 export function cancel(id: string) {
-  const { VideoComposer } = NativeModules;
-
   return VideoComposer.cancelComposition(id);
 }
 
 export type CompositionEvent = 'progress' | 'error';
 
-export function addListener(event: CompositionEvent, id: string, listener: ()=>void) {
-  return null;
+export function addListener(event: CompositionEvent, id: string, listener: (data?:any)=>void) {
+  return DeviceEventEmitter.addListener(`${eventPrefix}:${event}`, (data) => {
+    // if (!uploadId || !data || !data.id || data.id === uploadId) {
+    listener(data)
+    // }
+  });
 }
