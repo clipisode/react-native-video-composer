@@ -4,7 +4,7 @@
 
 @interface VideoComposer : RCTEventEmitter <RCTBridgeModule>
 {
-  
+  NSMutableDictionary *_compositionsData;
 }
 @end
 
@@ -22,7 +22,8 @@ static RCTEventEmitter* staticEventEmitter = nil;
   self = [super init];
   if (self) {
     staticEventEmitter = self;
-//    _responsesData = [NSMutableDictionary dictionary];
+    
+    _compositionsData = [NSMutableDictionary dictionary];
   }
   return self;
 }
@@ -48,6 +49,20 @@ static RCTEventEmitter* staticEventEmitter = nil;
 
 RCT_EXPORT_METHOD(compose:(NSDictionary *)composition id:(NSString *)exportId outPath:(NSString *)outPath resolver:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
 {
+  // SETUP DATA OBJECT AND CHECK FOR EXISTING EXPORT
+  
+  NSMutableDictionary *compositionData = _compositionsData[exportId];
+  
+  if (compositionData) {
+    reject(@"Duplicate", @"A composition with this exportId is already in progress.", nil);
+    return;
+  }
+  
+  compositionData = [NSMutableDictionary dictionary];
+  [_compositionsData setObject:compositionData forKey:exportId];
+  
+  // BEGIN COMPOSITION SETUP
+  
   AVMutableComposition *mixComposition = [[AVMutableComposition alloc] init];
   AVMutableCompositionTrack *videoTrack = [mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
   
@@ -88,8 +103,9 @@ RCT_EXPORT_METHOD(compose:(NSDictionary *)composition id:(NSString *)exportId ou
   
   // -- EXPORT
   
-  AVAssetExportSession *exporter = [[AVAssetExportSession alloc] initWithAsset:mixComposition presetName:AVAssetExportPresetHighestQuality];
-
+  AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:mixComposition presetName:AVAssetExportPresetHighestQuality];
+  [compositionData setObject:exporter forKey:@"exportSession"];
+  
   exporter.outputURL = [NSURL URLWithString:outPath];
   exporter.outputFileType = AVFileTypeMPEG4;
   exporter.shouldOptimizeForNetworkUse = YES;
@@ -101,38 +117,42 @@ RCT_EXPORT_METHOD(compose:(NSDictionary *)composition id:(NSString *)exportId ou
   }];
   
   dispatch_async(dispatch_get_main_queue(), ^{
-  NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer * _Nonnull timer) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer * _Nonnull timer) {
       if (exporter.status == AVAssetExportSessionStatusExporting) {
-        printf("%f\n", exporter.progress);
-        
         NSMutableDictionary *body = [NSMutableDictionary dictionary];
+        [body setObject:exportId forKey:@"id"];
         [body setObject:[NSNumber numberWithFloat:exporter.progress] forKey:@"progress"];
-        
+          
         [self sendEventWithName:@"@clipisode/react-native-video-composer:progress" body:body];
-      } else {
+      } else if (exporter.status == AVAssetExportSessionStatusCompleted) {
         [timer invalidate];
+        [self->_compositionsData removeObjectForKey:exportId];
       }
-    });
-  }];});
-  
-//
-//      let _ = Timer(timeInterval: 0.1, repeats: true) { timer in
-//        if (exporter!.status == .exporting) {
-//          print("status")
-//          print(exporter!.status)
-//  //        sendEvent(withName: "onProgress", body: ["progress": exporter!.progress])
-//        } else {
-//          timer.invalidate()
-//        }
-//      }
-//
-//      exporters[id] = exporter;
+    }];
+    [compositionData setObject:timer forKey:@"timer"];
+  });
 }
 
 RCT_EXPORT_METHOD(cancel:(NSString *)exportId)
 {
-  // TODO: Implement
+  NSMutableDictionary *compositionData = _compositionsData[exportId];
+  
+  if (!compositionData) {
+    NSLog(@"Composition data not found for given exportId.");
+  } else {
+    AVAssetExportSession *exportSession = compositionData[@"exportSession"];
+    NSTimer *timer = compositionData[@"timer"];
+    
+    if (timer) {
+      [timer invalidate];
+    }
+    
+    if (exportSession) {
+      [exportSession cancelExport];
+    }
+    
+    [_compositionsData removeObjectForKey:exportId];
+  }
 }
 
 @end

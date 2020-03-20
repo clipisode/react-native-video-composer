@@ -26,10 +26,11 @@ export function cancel(id: string) {
 
 export type CompositionEvent = 'progress' | 'error';
 
-export function addListener(event: CompositionEvent, id: string, listener: (data?:any)=>void) {
+export function addListener(event: CompositionEvent, id: string, listener: (data?:{id:string} & any)=>void) {
   return DeviceEventEmitter.addListener(`${eventPrefix}:${event}`, (data) => {
-    // if (!uploadId || !data || !data.id || data.id === uploadId) {
-    listener(data)
-    // }
+    const { id: eventId, ...other } = data;
+
+    if (id === eventId)
+      listener(other);
   });
 }
