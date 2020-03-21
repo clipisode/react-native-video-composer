@@ -9,6 +9,6 @@
     "strict": true,
     "jsx": "react-native"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/CompositionPlayer.tsx"],
   "exclude": ["node_modules", "**/__tests__/*"]
 }

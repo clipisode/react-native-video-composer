@@ -16,6 +16,9 @@ RCT_EXPORT_MODULE(CLPCompositionPlayer)
   return video;
 }
 
-RCT_EXPORT_VIEW_PROPERTY(composition, NSDictionary)
+RCT_EXPORT_VIEW_PROPERTY(composition, NSDictionary);
+RCT_EXPORT_VIEW_PROPERTY(paused, BOOL);
+RCT_EXPORT_VIEW_PROPERTY(rate, float);
+RCT_EXPORT_VIEW_PROPERTY(seek, NSDictionary);
 
 @end

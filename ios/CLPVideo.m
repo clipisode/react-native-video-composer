@@ -6,34 +6,41 @@
 
 @implementation CLPVideo
 {
-  AVPlayerViewController *_playerViewController;
+  AVMutableComposition *_mixComposition;
+  AVPlayerLayer *_playerLayer;
   AVPlayer *_player;
   AVPlayerItem *_playerItem;
   NSDictionary *_composition;
+  
+  BOOL _paused;
+  float _rate;
 }
 
 - (instancetype)init
 {
   if (self = [super init]) {
-    _playerViewController = [[AVPlayerViewController alloc] init];
-    
-    [self addSubview:_playerViewController.view];
-    _playerViewController.showsPlaybackControls = YES;
-    _playerViewController.view.frame = self.bounds;
+    _rate = 1.0;
   }
   
   return self;
 }
 
+- (void)layoutSubviews
+{
+  [super layoutSubviews];
+  
+  _playerLayer.frame = self.bounds;
+}
+
 - (void)removeFromSuperview
 {
-  if (_playerViewController.player != nil) {
-    [_playerViewController.player pause];
-    _playerViewController.player = nil;
+  if (_playerLayer.player != nil) {
+    [_playerLayer.player pause];
+    _playerLayer.player = nil;
   }
   
-  [_playerViewController.view removeFromSuperview];
-  _playerViewController = nil;
+  [_playerLayer removeFromSuperlayer];
+  _playerLayer = nil;
   
   [super removeFromSuperview];
 }
@@ -42,7 +49,49 @@
 {
   _composition = composition;
   
+  if (_mixComposition == nil) {
+    _mixComposition = [[AVMutableComposition alloc] init];
+    _playerItem = [AVPlayerItem playerItemWithAsset:_mixComposition];
+    _player = [AVPlayer playerWithPlayerItem:_playerItem];
+    _player.rate = 0.5;
+    _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
+    _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
+    _playerLayer.needsDisplayOnBoundsChange = YES;
+//    _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    [self.layer addSublayer:_playerLayer];
+  }
+  
   [self load];
+}
+
+- (void)setPaused:(BOOL)paused {
+  _paused = paused;
+  
+  if (paused) {
+    [_player pause];
+  } else {
+    [_player play];
+  }
+}
+
+- (void)setSeek:(NSDictionary *)info
+{
+  NSNumber *seekTime = info[@"time"];
+  
+  int timeScale = 1000;
+  
+  if (_playerItem && _playerItem.status == AVPlayerItemStatusReadyToPlay) {
+    CMTime to = CMTimeMakeWithSeconds([seekTime floatValue], timeScale);
+    
+    [_player seekToTime:to toleranceBefore:CMTimeMakeWithSeconds(0.1, timeScale) toleranceAfter:CMTimeMakeWithSeconds(0.1, timeScale)];
+  }
+}
+
+- (void)setRate:(float)rate
+{
+  _rate = rate;
+  
+  _player.rate = rate;
 }
 
 - (void)load
@@ -50,8 +99,7 @@
   NSDictionary *composition = _composition;
   // BEGIN COMPOSITION SETUP
   
-  AVMutableComposition *mixComposition = [[AVMutableComposition alloc] init];
-  AVMutableCompositionTrack *videoTrack = [mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+  AVMutableCompositionTrack *videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
   
   CMTime lastEndTime = kCMTimeZero;
   
@@ -86,12 +134,6 @@
   
   mainCompositionInst.instructions = [NSArray arrayWithObject:mainInstruction];
   mainCompositionInst.frameDuration = CMTimeMake(1, 30);
-  
-  
-  _playerItem = [AVPlayerItem playerItemWithAsset:mixComposition];
-  _player = [AVPlayer playerWithPlayerItem:_playerItem];
-  _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
-  _playerViewController.player = _player;
 }
 
 @end
