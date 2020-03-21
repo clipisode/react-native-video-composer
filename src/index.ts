@@ -1,4 +1,5 @@
 import { NativeModules, DeviceEventEmitter } from "react-native";
+export {  CompositionPlayer } from './CompositionPlayer';
 
 const { VideoComposer } = NativeModules;
 
