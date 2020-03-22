@@ -1,7 +1,14 @@
 #import <AVFoundation/AVFoundation.h>
 #import <AVKit/AVKit.h>
+#import <React/RCTComponent.h>
+#import <React/RCTBridgeModule.h>
+#import <React/RCTComponent.h>
+#import <Photos/Photos.h>
 
 @interface CLPVideo : UIView <AVPlayerViewControllerDelegate>
+
+@property (nonatomic, copy) RCTDirectEventBlock onVideoProgress;
+
 @end
 
 @implementation CLPVideo
@@ -11,6 +18,9 @@
   AVPlayer *_player;
   AVPlayerItem *_playerItem;
   NSDictionary *_composition;
+  AVMutableVideoComposition *_mainCompositionInst;
+  
+  id _timeObserver;
   
   BOOL _paused;
   float _rate;
@@ -45,6 +55,55 @@
   [super removeFromSuperview];
 }
 
+-(void)addPlayerTimeObserver
+{
+  const Float64 progressUpdateIntervalMS = 250.0 / 1000;
+  // @see endScrubbing in AVPlayerDemoPlaybackViewController.m
+  // of https://developer.apple.com/library/ios/samplecode/AVPlayerDemo/Introduction/Intro.html
+  __weak CLPVideo *weakSelf = self;
+  _timeObserver = [_player addPeriodicTimeObserverForInterval:CMTimeMakeWithSeconds(progressUpdateIntervalMS, NSEC_PER_SEC)
+                                                        queue:NULL
+                                                   usingBlock:^(CMTime time) { [weakSelf sendProgressUpdate]; }
+                   ];
+}
+
+/* Cancels the previously registered time observer. */
+-(void)removePlayerTimeObserver
+{
+  if (_timeObserver)
+  {
+    [_player removeTimeObserver:_timeObserver];
+    _timeObserver = nil;
+  }
+}
+
+- (void)sendProgressUpdate
+{
+  AVPlayerItem *video = [_player currentItem];
+  
+  if (video == nil || video.status != AVPlayerItemStatusReadyToPlay) {
+    return;
+  }
+  
+  CMTime playerDuration = video.duration;
+  
+  CMTime currentTime = _player.currentTime;
+//  const Float64 duration = CMTimeGetSeconds(playerDuration);
+  const Float64 currentTimeSecs = CMTimeGetSeconds(currentTime);
+//
+//  [[NSNotificationCenter defaultCenter] postNotificationName:@"RCTVideo_progress" object:nil userInfo:@{@"progress": [NSNumber numberWithDouble: currentTimeSecs / duration]}];
+  
+  if( currentTimeSecs >= 0 && self.onVideoProgress) {
+    self.onVideoProgress(@{
+                           @"currentTime": [NSNumber numberWithFloat:CMTimeGetSeconds(currentTime)],
+                           @"atValue": [NSNumber numberWithLongLong:currentTime.value],
+                           @"atTimescale": [NSNumber numberWithInt:currentTime.timescale],
+//                           @"target": self.reactTag,
+                           });
+  }
+}
+
+
 - (void)setComposition:(NSDictionary *)composition
 {
   _composition = composition;
@@ -59,6 +118,7 @@
     _playerLayer.needsDisplayOnBoundsChange = YES;
 //    _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     [self.layer addSublayer:_playerLayer];
+    [self addPlayerTimeObserver];
   }
   
   [self load];
@@ -92,6 +152,26 @@
   _rate = rate;
   
   _player.rate = rate;
+}
+
+- (void)save:(NSString *)outPath resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
+{
+  AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPresetHighestQuality];
+//  [compositionData setObject:exporter forKey:@"exportSession"];
+  
+  exporter.outputURL = [NSURL URLWithString:outPath];
+  exporter.outputFileType = AVFileTypeMPEG4;
+  exporter.shouldOptimizeForNetworkUse = YES;
+  exporter.videoComposition = _mainCompositionInst;
+  [exporter exportAsynchronouslyWithCompletionHandler:^{
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+        [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:exporter.outputURL];
+      } completionHandler:^(BOOL success, NSError * _Nullable error) {
+        resolve(nil);
+      }];
+    });
+  }];
 }
 
 - (void)load
@@ -128,12 +208,12 @@
   
   mainInstruction.layerInstructions = [NSArray arrayWithObjects:videolayerInstruction, nil];
 
-  AVMutableVideoComposition *mainCompositionInst = [AVMutableVideoComposition videoComposition];
+  _mainCompositionInst = [AVMutableVideoComposition videoComposition];
   
-  mainCompositionInst.renderSize = CGSizeMake(720.0, 1280.0);
+  _mainCompositionInst.renderSize = CGSizeMake(720.0, 1280.0);
   
-  mainCompositionInst.instructions = [NSArray arrayWithObject:mainInstruction];
-  mainCompositionInst.frameDuration = CMTimeMake(1, 30);
+  _mainCompositionInst.instructions = [NSArray arrayWithObject:mainInstruction];
+  _mainCompositionInst.frameDuration = CMTimeMake(1, 30);
 }
 
 @end
