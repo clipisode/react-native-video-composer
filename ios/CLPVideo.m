@@ -19,6 +19,8 @@
   AVPlayerItem *_playerItem;
   NSDictionary *_composition;
   AVMutableVideoComposition *_mainCompositionInst;
+  AVSynchronizedLayer *_syncLayer;
+  CALayer *_overlayLayer;
   
   id _timeObserver;
   
@@ -112,13 +114,55 @@
     _mixComposition = [[AVMutableComposition alloc] init];
     _playerItem = [AVPlayerItem playerItemWithAsset:_mixComposition];
     _player = [AVPlayer playerWithPlayerItem:_playerItem];
-    _player.rate = 0.5;
+    _player.rate = 1.0;
     _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
     _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
     _playerLayer.needsDisplayOnBoundsChange = YES;
 //    _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     [self.layer addSublayer:_playerLayer];
     [self addPlayerTimeObserver];
+    
+    _syncLayer = [AVSynchronizedLayer synchronizedLayerWithPlayerItem:_playerItem];
+    
+    // ADD OVERLAY
+    _overlayLayer = [[CALayer alloc] init];
+    _overlayLayer.frame = CGRectMake(40, 40, 40, 40);
+    _overlayLayer.backgroundColor = [[UIColor blueColor] CGColor];
+    
+    NSMutableAttributedString *str = [[NSMutableAttributedString alloc] initWithString:@"firstsecondthird"];
+    [str addAttribute:NSForegroundColorAttributeName value:[UIColor redColor] range:NSMakeRange(0,5)];
+    [str addAttribute:NSForegroundColorAttributeName value:[UIColor greenColor] range:NSMakeRange(5,6)];
+    [str addAttribute:NSForegroundColorAttributeName value:[UIColor blueColor] range:NSMakeRange(11,5)];
+
+    CATextLayer *textLayer = [[CATextLayer alloc] init];
+    
+    textLayer.string = str;
+    textLayer.shouldRasterize = true;
+//    textLayer.rasterizationScale = UIScreen.main.scale;
+//    textLayer.backgroundColor = UIColor.clear.cgColor;
+//    textLayer.alignmentMode = NSTextAlignmentCenter;
+    
+    textLayer.frame = CGRectMake(80, 80, 300, 200);
+    
+    CABasicAnimation *scaleAnimation = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+    
+    scaleAnimation.fromValue = [NSNumber numberWithFloat:0.8];
+    scaleAnimation.toValue = [NSNumber numberWithFloat:1.2];
+    scaleAnimation.duration = 3;
+    scaleAnimation.repeatCount = CGFLOAT_MAX;
+    scaleAnimation.autoreverses = YES;
+    scaleAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+    scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero;
+    scaleAnimation.removedOnCompletion = NO;
+    
+    [textLayer addAnimation:scaleAnimation forKey:@"scale"];
+    
+    [textLayer displayIfNeeded];
+    [_syncLayer addSublayer:textLayer];
+    
+    
+    [_syncLayer addSublayer:_overlayLayer];
+    [_playerLayer addSublayer:_syncLayer];
   }
   
   [self load];
@@ -214,6 +258,8 @@
   
   _mainCompositionInst.instructions = [NSArray arrayWithObject:mainInstruction];
   _mainCompositionInst.frameDuration = CMTimeMake(1, 30);
+  
+  
 }
 
 @end
