@@ -21,6 +21,8 @@
   AVMutableVideoComposition *_mainCompositionInst;
   AVSynchronizedLayer *_syncLayer;
   CALayer *_overlayLayer;
+  CMTime lastEndTime;
+  AVMutableCompositionTrack *videoTrack;
   
   id _timeObserver;
   
@@ -41,7 +43,10 @@
 {
   [super layoutSubviews];
   
-  _playerLayer.frame = self.bounds;
+//  _syncLayer.frame = self.bounds;
+  _syncLayer.frame = self.bounds;
+  _syncLayer.anchorPoint = CGPointMake(0.0, 0.0);
+  _syncLayer.transform = CATransform3DConcat(CATransform3DMakeScale(self.bounds.size.width / 720.0, self.bounds.size.height / 1280.0, 1), CATransform3DMakeTranslation(-self.bounds.size.width / 2, -self.bounds.size.height / 2, 0.0));
 }
 
 - (void)removeFromSuperview
@@ -105,6 +110,73 @@
   }
 }
 
+- (NSAttributedString *)createBasicString:(NSString *)text
+{
+  NSMutableAttributedString *str = [[NSMutableAttributedString alloc] initWithString:@"firstsecondthird"];
+  [str addAttribute:NSForegroundColorAttributeName value:[UIColor redColor] range:NSMakeRange(0,5)];
+  [str addAttribute:NSForegroundColorAttributeName value:[UIColor greenColor] range:NSMakeRange(5,6)];
+  [str addAttribute:NSForegroundColorAttributeName value:[UIColor blueColor] range:NSMakeRange(11,5)];
+  
+  return str;
+}
+
+- (CATextLayer *)createTextLayer:(NSAttributedString *)attributedString
+{
+  CATextLayer *textLayer = [CATextLayer layer];
+  
+  textLayer.string = attributedString;
+  textLayer.shouldRasterize = true;
+  
+  return textLayer;
+}
+
+- (CABasicAnimation *)createPulseAnimation
+{
+  CABasicAnimation *scaleAnimation = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+  
+  scaleAnimation.fromValue = [NSNumber numberWithFloat:0.8];
+  scaleAnimation.toValue = [NSNumber numberWithFloat:1.2];
+  scaleAnimation.duration = 3;
+  scaleAnimation.repeatCount = CGFLOAT_MAX;
+  scaleAnimation.autoreverses = YES;
+  scaleAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+  scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero;
+  scaleAnimation.removedOnCompletion = NO;
+  
+  return scaleAnimation;
+}
+
+- (CALayer *)createParentLayer:(CALayer *)videoLayer
+{
+  CALayer *parentLayer = [CALayer layer];
+  parentLayer.frame = CGRectMake(0.0, 0.0, 720.0, 1280.0);
+  parentLayer.backgroundColor = [[UIColor purpleColor] CGColor];
+  
+  videoLayer.frame = CGRectMake(20, 20, parentLayer.frame.size.width - 40,  parentLayer.frame.size.height - 40);
+  
+  [parentLayer addSublayer:videoLayer];
+  
+  // ADD OVERLAY
+  _overlayLayer = [CALayer layer];
+  _overlayLayer.frame = CGRectMake(40, 40, 40, 40);
+  _overlayLayer.backgroundColor = [[UIColor blueColor] CGColor];
+  
+  NSAttributedString *str = [self createBasicString:@"firstsecondthird"];
+  CATextLayer *textLayer = [self createTextLayer:str];
+  
+  textLayer.frame = CGRectMake(80, 80, 300, 200);
+  
+  CABasicAnimation *pulse = [self createPulseAnimation];
+  
+  [textLayer addAnimation:pulse forKey:@"scale"];
+  
+  [textLayer displayIfNeeded];
+  
+  [parentLayer addSublayer:textLayer];
+  [parentLayer addSublayer:_overlayLayer];
+  
+  return parentLayer;
+}
 
 - (void)setComposition:(NSDictionary *)composition
 {
@@ -118,51 +190,24 @@
     _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
     _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
     _playerLayer.needsDisplayOnBoundsChange = YES;
-//    _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    [self.layer addSublayer:_playerLayer];
-    [self addPlayerTimeObserver];
+    _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     
     _syncLayer = [AVSynchronizedLayer synchronizedLayerWithPlayerItem:_playerItem];
+    [self.layer addSublayer:_syncLayer];
     
-    // ADD OVERLAY
-    _overlayLayer = [[CALayer alloc] init];
-    _overlayLayer.frame = CGRectMake(40, 40, 40, 40);
-    _overlayLayer.backgroundColor = [[UIColor blueColor] CGColor];
+    [self addPlayerTimeObserver];
     
-    NSMutableAttributedString *str = [[NSMutableAttributedString alloc] initWithString:@"firstsecondthird"];
-    [str addAttribute:NSForegroundColorAttributeName value:[UIColor redColor] range:NSMakeRange(0,5)];
-    [str addAttribute:NSForegroundColorAttributeName value:[UIColor greenColor] range:NSMakeRange(5,6)];
-    [str addAttribute:NSForegroundColorAttributeName value:[UIColor blueColor] range:NSMakeRange(11,5)];
-
-    CATextLayer *textLayer = [[CATextLayer alloc] init];
+    CALayer *parentLayer = [self createParentLayer:_playerLayer];
     
-    textLayer.string = str;
-    textLayer.shouldRasterize = true;
-//    textLayer.rasterizationScale = UIScreen.main.scale;
-//    textLayer.backgroundColor = UIColor.clear.cgColor;
-//    textLayer.alignmentMode = NSTextAlignmentCenter;
+//    _syncLayer.frame = parentLayer.frame;
+//    parentLayer.frame = self.bounds;
+    [_syncLayer addSublayer:parentLayer];
     
-    textLayer.frame = CGRectMake(80, 80, 300, 200);
-    
-    CABasicAnimation *scaleAnimation = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
-    
-    scaleAnimation.fromValue = [NSNumber numberWithFloat:0.8];
-    scaleAnimation.toValue = [NSNumber numberWithFloat:1.2];
-    scaleAnimation.duration = 3;
-    scaleAnimation.repeatCount = CGFLOAT_MAX;
-    scaleAnimation.autoreverses = YES;
-    scaleAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
-    scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero;
-    scaleAnimation.removedOnCompletion = NO;
-    
-    [textLayer addAnimation:scaleAnimation forKey:@"scale"];
-    
-    [textLayer displayIfNeeded];
-    [_syncLayer addSublayer:textLayer];
-    
-    
-    [_syncLayer addSublayer:_overlayLayer];
-    [_playerLayer addSublayer:_syncLayer];
+//
+//
+//    [_syncLayer addSublayer:textLayer];
+//    [_syncLayer addSublayer:_overlayLayer];
+//    [_playerLayer addSublayer:_syncLayer];
   }
   
   [self load];
@@ -198,15 +243,62 @@
   _player.rate = rate;
 }
 
+- (UIImage *)imageWithColor:(UIColor *)color rectSize:(CGRect)imageSize {
+    CGRect rect = imageSize;
+    UIGraphicsBeginImageContextWithOptions(rect.size, NO, 0);
+    [color setFill];
+    UIRectFill(rect);   // Fill it with your color
+    UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    
+    return image;
+}
+
 - (void)save:(NSString *)outPath resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
 {
-  AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPresetHighestQuality];
+  AVMutableVideoCompositionInstruction *mainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
+  mainInstruction.timeRange = CMTimeRangeMake(kCMTimeZero, lastEndTime);
+  
+  AVMutableVideoCompositionLayerInstruction *videolayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:videoTrack];
+  [videolayerInstruction setOpacity:0.0 atTime:lastEndTime];
+  
+  mainInstruction.layerInstructions = [NSArray arrayWithObjects:videolayerInstruction, nil];
+
+  _mainCompositionInst = [AVMutableVideoComposition videoComposition];
+  
+  _mainCompositionInst.renderSize = CGSizeMake(720.0, 1280.0);
+  
+  _mainCompositionInst.instructions = [NSArray arrayWithObject:mainInstruction];
+  _mainCompositionInst.frameDuration = CMTimeMake(1, 30);
+  
+  CALayer *videoLayer = [CALayer layer];
+  CALayer *parentLayer = [self createParentLayer:videoLayer];
+  parentLayer.geometryFlipped = YES;
+  
+//  CALayer *backgroundLayer = [CALayer layer];
+//  UIImage *borderImage = [self imageWithColor:[UIColor blueColor] rectSize:CGRectMake(0, 0, 720, 1280)];
+//  [backgroundLayer setContents:(id)[borderImage CGImage]];
+//  backgroundLayer.frame = CGRectMake(0, 0, 720, 1280);
+//  [backgroundLayer setMasksToBounds:YES];
+//  CALayer *videoLayer = [CALayer layer];
+//     videoLayer.frame = CGRectMake(20, 20, 680, 1240);
+  
+//  CALayer *parentLayer = [CALayer layer];
+  
+//  [parentLayer addSublayer:backgroundLayer];
+//  [parentLayer addSublayer:videoLayer];
+
+  
+  _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithPostProcessingAsVideoLayer:videoLayer inLayer:parentLayer];
+
+  AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition                                                                                           presetName:AVAssetExportPresetHighestQuality];
 //  [compositionData setObject:exporter forKey:@"exportSession"];
   
   exporter.outputURL = [NSURL URLWithString:outPath];
   exporter.outputFileType = AVFileTypeMPEG4;
   exporter.shouldOptimizeForNetworkUse = YES;
   exporter.videoComposition = _mainCompositionInst;
+  
   [exporter exportAsynchronouslyWithCompletionHandler:^{
     dispatch_async(dispatch_get_main_queue(), ^{
       [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
@@ -223,9 +315,9 @@
   NSDictionary *composition = _composition;
   // BEGIN COMPOSITION SETUP
   
-  AVMutableCompositionTrack *videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+  videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
   
-  CMTime lastEndTime = kCMTimeZero;
+  lastEndTime = kCMTimeZero;
   
   NSArray *videos = composition[@"videos"];
   
@@ -243,23 +335,6 @@
           
     lastEndTime = CMTimeAdd(lastEndTime, asset.duration);
   }
-  
-  AVMutableVideoCompositionInstruction *mainInstruction = [[AVMutableVideoCompositionInstruction alloc] init];
-  mainInstruction.timeRange = CMTimeRangeMake(kCMTimeZero, lastEndTime);
-  
-  AVMutableVideoCompositionLayerInstruction *videolayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:videoTrack];
-  [videolayerInstruction setOpacity:0.0 atTime:lastEndTime];
-  
-  mainInstruction.layerInstructions = [NSArray arrayWithObjects:videolayerInstruction, nil];
-
-  _mainCompositionInst = [AVMutableVideoComposition videoComposition];
-  
-  _mainCompositionInst.renderSize = CGSizeMake(720.0, 1280.0);
-  
-  _mainCompositionInst.instructions = [NSArray arrayWithObject:mainInstruction];
-  _mainCompositionInst.frameDuration = CMTimeMake(1, 30);
-  
-  
 }
 
 @end
