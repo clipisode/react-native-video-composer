@@ -22,6 +22,7 @@ RCT_EXPORT_VIEW_PROPERTY(paused, BOOL);
 RCT_EXPORT_VIEW_PROPERTY(rate, float);
 RCT_EXPORT_VIEW_PROPERTY(seek, NSDictionary);
 RCT_EXPORT_VIEW_PROPERTY(onVideoProgress, RCTDirectEventBlock);
+RCT_EXPORT_VIEW_PROPERTY(onVideoLoad, RCTDirectEventBlock);
 
 RCT_EXPORT_METHOD(save:(NSString *)outPath
         reactTag:(nonnull NSNumber *)reactTag

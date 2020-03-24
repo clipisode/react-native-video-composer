@@ -5,11 +5,12 @@ import { requireNativeComponent } from 'react-native';
 const CLPCompositionPlayer = requireNativeComponent('CLPCompositionPlayer');
 
 type Props = {
-  onProgress: (e: any) => void;
+  onProgress: (e: { progress: number }) => void;
+  onLoad: (e: { duration: number }) => void;
   paused?: boolean
 };
 
-export const CompositionPlayer = React.forwardRef( ({onProgress, ...props}: Props, ref: any) => {
+export const CompositionPlayer = React.forwardRef( ({onProgress, onLoad, ...props}: Props, ref: any) => {
   const nativeComponentRef = React.useRef<typeof CLPCompositionPlayer>(null);
   React.useImperativeHandle(ref, () => ({
     seek: (time: number) => {
@@ -28,6 +29,7 @@ export const CompositionPlayer = React.forwardRef( ({onProgress, ...props}: Prop
   
   return (
     <CLPCompositionPlayer
+      onVideoLoad={(e: any) => onLoad && onLoad(e.nativeEvent)}
       onVideoProgress={(e: any) => onProgress && onProgress(e.nativeEvent)}
       ref={nativeComponentRef}
       {...props} 

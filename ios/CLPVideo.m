@@ -8,6 +8,7 @@
 @interface CLPVideo : UIView <AVPlayerViewControllerDelegate>
 
 @property (nonatomic, copy) RCTDirectEventBlock onVideoProgress;
+@property (nonatomic, copy) RCTDirectEventBlock onVideoLoad;
 
 @end
 
@@ -30,6 +31,8 @@
   BOOL _paused;
   float _rate;
 }
+
+static NSString *const statusKeyPath = @"status";
 
 - (instancetype)init
 {
@@ -57,6 +60,7 @@
   }
   
   [_playerLayer removeFromSuperlayer];
+  [self removePlayerItemObservers];
   _playerLayer = nil;
   
   [super removeFromSuperview];
@@ -243,6 +247,44 @@
   return parentLayer;
 }
 
+- (void)addPlayerItemObservers
+{
+  [_playerItem addObserver:self forKeyPath:statusKeyPath options:0 context:nil];
+//  [_playerItem addObserver:self forKeyPath:playbackBufferEmptyKeyPath options:0 context:nil];
+//  [_playerItem addObserver:self forKeyPath:playbackLikelyToKeepUpKeyPath options:0 context:nil];
+//  [_playerItem addObserver:self forKeyPath:timedMetadata options:NSKeyValueObservingOptionNew context:nil];
+}
+
+- (void)removePlayerItemObservers
+{
+  [_playerItem removeObserver:self forKeyPath:statusKeyPath];
+//  [_playerItem removeObserver:self forKeyPath:playbackBufferEmptyKeyPath];
+//  [_playerItem removeObserver:self forKeyPath:playbackLikelyToKeepUpKeyPath];
+//  [_playerItem removeObserver:self forKeyPath:timedMetadata];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+  if (object != _playerItem) {
+    return;
+  }
+  
+  // handle status change
+  if ([keyPath isEqualToString:statusKeyPath]) {
+    if (_playerItem.status == AVPlayerItemStatusReadyToPlay) {
+      float duration = CMTimeGetSeconds(_playerItem.asset.duration);
+      
+      if (isnan(duration)) {
+        duration = 0.0;
+      }
+      
+      if (self.onVideoLoad != nil) {
+        self.onVideoLoad(@{ @"duration": [NSNumber numberWithFloat:duration] });
+      }
+    }
+  }
+}
+
 - (void)setComposition:(NSDictionary *)composition
 {
   _composition = composition;
@@ -255,6 +297,9 @@
     _player.rate = 1.0;
     _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
     _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
+    
+    [self addPlayerItemObservers];
+    
     _playerLayer.needsDisplayOnBoundsChange = YES;
     _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     
