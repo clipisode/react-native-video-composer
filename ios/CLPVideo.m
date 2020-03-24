@@ -9,6 +9,7 @@
 
 @property (nonatomic, copy) RCTDirectEventBlock onVideoProgress;
 @property (nonatomic, copy) RCTDirectEventBlock onVideoLoad;
+@property (nonatomic, copy) RCTDirectEventBlock onExportProgress;
 
 @end
 
@@ -335,7 +336,15 @@ static NSString *const statusKeyPath = @"status";
     CMTime to = CMTimeMakeWithSeconds([seekTime floatValue], timeScale);
     CMTime tolerance = kCMTimeZero; // CMTimeMakeWithSeconds(0.05, timeScale);
     
-    [_player seekToTime:to toleranceBefore:tolerance toleranceAfter:tolerance];
+    if (!_paused) {
+      [_player pause];
+    }
+    
+    [_player seekToTime:to toleranceBefore:tolerance toleranceAfter:tolerance completionHandler:^(BOOL finished) {
+      if (!self->_paused) {
+        [self->_player play];
+      }
+    }];
   }
 }
 
@@ -370,17 +379,30 @@ static NSString *const statusKeyPath = @"status";
   parentLayer.geometryFlipped = YES;
 
   _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithPostProcessingAsVideoLayer:videoLayer inLayer:parentLayer];
-
-  AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition                                                                                           presetName:AVAssetExportPresetHighestQuality];
+  
+  AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPreset1280x720];
 //  [compositionData setObject:exporter forKey:@"exportSession"];
   
   exporter.outputURL = [NSURL URLWithString:outPath];
   exporter.outputFileType = AVFileTypeMPEG4;
-  exporter.shouldOptimizeForNetworkUse = YES;
+//  exporter.shouldOptimizeForNetworkUse = YES;
   
   exporter.videoComposition = _mainCompositionInst;
   
   if (_mixComposition.isExportable) {
+    if (self.onExportProgress) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer * _Nonnull timer) {
+          if (exporter.status == AVAssetExportSessionStatusExporting) {
+            self.onExportProgress(@{@"progress": [NSNumber numberWithFloat:exporter.progress]});
+          } else if (exporter.status == AVAssetExportSessionStatusCompleted) {
+            [timer invalidate];
+          }
+        }];
+      });
+    }
+    
+    
     [exporter exportAsynchronouslyWithCompletionHandler:^{
       if (exporter.status == AVAssetExportSessionStatusCompleted) {
         dispatch_async(dispatch_get_main_queue(), ^{
