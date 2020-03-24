@@ -16,7 +16,7 @@ export const CompositionPlayer = React.forwardRef( ({onProgress, onLoad, ...prop
     seek: (time: number) => {
       nativeComponentRef.current.setNativeProps({ seek: { time } })
     },
-    setPlaybackRate: (rate: number) => nativeComponentRef.current.setNativeProps({ rate }),
+    setPlaybackRate: (rate: number) => null, // nativeComponentRef.current.setNativeProps({ rate }),
     play: () => null,
     pause: () => null,
     save: async (outputPath: string) => {

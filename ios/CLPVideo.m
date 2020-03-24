@@ -294,7 +294,6 @@ static NSString *const statusKeyPath = @"status";
     _mixComposition = [AVMutableComposition composition];
     _playerItem = [AVPlayerItem playerItemWithAsset:_mixComposition];
     _player = [AVPlayer playerWithPlayerItem:_playerItem];
-    _player.rate = 1.0;
     _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
     _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
     
@@ -331,19 +330,20 @@ static NSString *const statusKeyPath = @"status";
   NSNumber *seekTime = info[@"time"];
   
   int timeScale = 1000;
-  
+
   if (_playerItem && _playerItem.status == AVPlayerItemStatusReadyToPlay) {
     CMTime to = CMTimeMakeWithSeconds([seekTime floatValue], timeScale);
+    CMTime tolerance = kCMTimeZero; // CMTimeMakeWithSeconds(0.05, timeScale);
     
-    [_player seekToTime:to toleranceBefore:CMTimeMakeWithSeconds(0.1, timeScale) toleranceAfter:CMTimeMakeWithSeconds(0.1, timeScale)];
+    [_player seekToTime:to toleranceBefore:tolerance toleranceAfter:tolerance];
   }
 }
 
 - (void)setRate:(float)rate
 {
   _rate = rate;
-  
-  _player.rate = rate;
+
+  [_player setRate:rate];
 }
 
 - (void)save:(NSString *)outPath resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
