@@ -24,7 +24,7 @@
   AVSynchronizedLayer *_syncLayer;
   CALayer *_overlayLayer;
   CMTime lastEndTime;
-  AVMutableCompositionTrack *_videoTrack;
+  NSMutableArray *_videoTracks;
   AVMutableCompositionTrack *_audioTrack;
   
   id _timeObserver;
@@ -39,6 +39,7 @@ static NSString *const statusKeyPath = @"status";
 {
   if (self = [super init]) {
     _rate = 1.0;
+    _videoTracks = [NSMutableArray array];
   }
   
   return self;
@@ -294,6 +295,7 @@ static NSString *const statusKeyPath = @"status";
     
     _mixComposition = [AVMutableComposition composition];
     _playerItem = [AVPlayerItem playerItemWithAsset:_mixComposition];
+    
     _player = [AVPlayer playerWithPlayerItem:_playerItem];
     _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
     _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
@@ -314,6 +316,9 @@ static NSString *const statusKeyPath = @"status";
   }
   
   [self load];
+  
+  // TODO : does this help match the export?
+  _playerItem.videoComposition = _mainCompositionInst;
 }
 
 - (void)setPaused:(BOOL)paused {
@@ -359,21 +364,6 @@ static NSString *const statusKeyPath = @"status";
 {
   [_player pause];
 
-  AVMutableVideoCompositionInstruction *mainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
-  mainInstruction.timeRange = CMTimeRangeMake(kCMTimeZero, lastEndTime);
-  
-  AVMutableVideoCompositionLayerInstruction *videolayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:_videoTrack];
-  [videolayerInstruction setOpacity:0.0 atTime:lastEndTime];
-  
-  mainInstruction.layerInstructions = [NSArray arrayWithObjects:videolayerInstruction, nil];
-
-  _mainCompositionInst = [AVMutableVideoComposition videoComposition];
-  
-  _mainCompositionInst.renderSize = CGSizeMake(720.0, 1280.0);
-  
-  _mainCompositionInst.instructions = [NSArray arrayWithObject:mainInstruction];
-  _mainCompositionInst.frameDuration = CMTimeMake(1, 30);
-  
   CALayer *videoLayer = [CALayer layer];
   CALayer *parentLayer = [self createParentLayer:videoLayer];
   parentLayer.geometryFlipped = YES;
@@ -436,14 +426,18 @@ static NSString *const statusKeyPath = @"status";
   NSDictionary *composition = _composition;
   // BEGIN COMPOSITION SETUP
   
-  _videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+//  _videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
   _audioTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeAudio preferredTrackID:kCMPersistentTrackID_Invalid];
   
   lastEndTime = kCMTimeZero;
   
   NSArray *videos = composition[@"videos"];
   
+  NSMutableArray *videolayerInstructions = [NSMutableArray array];
+  
   for (NSDictionary* video in videos) {
+    AVMutableCompositionTrack *_videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+    
     NSString *path = video[@"path"];
     // NSNumber* startAt = video[@"startAt"];
     
@@ -453,15 +447,36 @@ static NSString *const statusKeyPath = @"status";
     // Add video
     NSArray* asset_videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
     AVAssetTrack* first_videoTrack = asset_videoTracks[0];
-    [_videoTrack insertTimeRange:first_videoTrack.timeRange ofTrack:first_videoTrack atTime:lastEndTime error:nil];
     
+    [_videoTrack insertTimeRange:first_videoTrack.timeRange ofTrack:first_videoTrack atTime:lastEndTime error:NULL];
+
     // Add audio
     NSArray* asset_audioTracks = [asset tracksWithMediaType:AVMediaTypeAudio];
     AVAssetTrack* first_audioTrack = asset_audioTracks[0];
     [_audioTrack insertTimeRange:first_videoTrack.timeRange ofTrack:first_audioTrack atTime:lastEndTime error:nil];
           
-    lastEndTime = CMTimeAdd(lastEndTime, first_videoTrack.timeRange.duration);
+    CMTime nextLastEndTime = CMTimeAdd(lastEndTime, first_videoTrack.timeRange.duration);
+    
+    [_videoTracks addObject:_videoTrack];
+    
+    AVMutableVideoCompositionLayerInstruction *videolayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:_videoTrack];
+    [videolayerInstruction setOpacity:0.0 atTime:nextLastEndTime];
+    [videolayerInstruction setTransform:first_videoTrack.preferredTransform atTime:lastEndTime];
+    [videolayerInstructions addObject:videolayerInstruction];
+    
+    lastEndTime = nextLastEndTime;
   }
+  
+  AVMutableVideoCompositionInstruction *mainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
+  mainInstruction.timeRange = CMTimeRangeMake(kCMTimeZero, lastEndTime);
+  mainInstruction.layerInstructions = videolayerInstructions;
+  
+  _mainCompositionInst = [AVMutableVideoComposition videoComposition];
+
+  _mainCompositionInst.renderSize = CGSizeMake(720.0, 1280.0);
+
+  _mainCompositionInst.instructions = @[mainInstruction];
+  _mainCompositionInst.frameDuration = CMTimeMake(1, 30);
 }
 
 @end
