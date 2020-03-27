@@ -4,6 +4,7 @@
 #import <React/RCTBridgeModule.h>
 #import <React/RCTComponent.h>
 #import <Photos/Photos.h>
+#import "CLPThemeCompositor.h"
 
 @interface CLPVideo : UIView <AVPlayerViewControllerDelegate>
 
@@ -473,6 +474,7 @@ static NSString *const statusKeyPath = @"status";
   mainInstruction.layerInstructions = videolayerInstructions;
   
   _mainCompositionInst = [AVMutableVideoComposition videoComposition];
+  _mainCompositionInst.customVideoCompositorClass = [CLPThemeCompositor class];
 
   _mainCompositionInst.renderSize = CGSizeMake(720.0, 1280.0);
 
