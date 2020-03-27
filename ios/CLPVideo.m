@@ -5,6 +5,8 @@
 #import <React/RCTComponent.h>
 #import <Photos/Photos.h>
 #import "CLPThemeCompositor.h"
+#import "CLPThemeOverlayLayer.h"
+
 
 @interface CLPVideo : UIView <AVPlayerViewControllerDelegate>
 
@@ -25,7 +27,6 @@
   AVSynchronizedLayer *_syncLayer;
   CALayer *_overlayLayer;
   CMTime lastEndTime;
-//  AVMutableCompositionTrack *_videoTrack;
   NSMutableArray *_videoTracks;
   AVMutableCompositionTrack *_audioTrack;
   
@@ -167,6 +168,21 @@ static NSString *const statusKeyPath = @"status";
   return fadeInAnimation;
 }
 
+- (CABasicAnimation *)createProgressOverDurationAnimation
+{
+  CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"progress"];
+  
+  NSNumber *duration = _composition[@"duration"];
+  
+  animation.beginTime = AVCoreAnimationBeginTimeAtZero;
+  animation.duration = [duration doubleValue];
+  animation.fromValue = [NSNumber numberWithFloat:0.0f];
+  animation.toValue = [NSNumber numberWithFloat:1.0f];
+  animation.removedOnCompletion = NO;
+  
+  return animation;
+}
+
 - (CALayer *)createBottomGradient
 {
   CAGradientLayer *gradientLayer = [CAGradientLayer layer];
@@ -213,6 +229,8 @@ static NSString *const statusKeyPath = @"status";
 - (CALayer *)createParentLayer:(CALayer *)videoLayer
 {
   CALayer *parentLayer = [CALayer layer];
+
+  parentLayer.drawsAsynchronously = NO;
   parentLayer.frame = CGRectMake(0.0, 0.0, 720.0, 1280.0);
   parentLayer.backgroundColor = [[UIColor purpleColor] CGColor];
   
@@ -220,10 +238,18 @@ static NSString *const statusKeyPath = @"status";
   
   [parentLayer addSublayer:videoLayer];
   
-  // ADD OVERLAY
-  _overlayLayer = [CALayer layer];
-  _overlayLayer.frame = CGRectMake(40, 40, 40, 40);
-  _overlayLayer.backgroundColor = [[UIColor blueColor] CGColor];
+  _overlayLayer = [CLPThemeOverlayLayer layer];
+  _overlayLayer.frame = parentLayer.frame;
+  
+  CABasicAnimation *progressOverDurationAnimation = [self createProgressOverDurationAnimation];
+  [_overlayLayer addAnimation:progressOverDurationAnimation forKey:@"progress"];
+  
+  [parentLayer addSublayer:_overlayLayer];
+  
+  // blue box
+  CALayer *blueSquare = [CALayer layer];
+  blueSquare.frame = CGRectMake(40, 40, 40, 40);
+  blueSquare.backgroundColor = [[UIColor blueColor] CGColor];
   
   NSAttributedString *str = [self createBasicString:@"firstsecondthird"];
   CATextLayer *textLayer = [self createTextLayer:str];
@@ -231,6 +257,7 @@ static NSString *const statusKeyPath = @"status";
   textLayer.frame = CGRectMake(80, 80, 300, 200);
   
   CABasicAnimation *pulse = [self createPulseAnimation];
+
   
   CALayer *gradientLayer = [self createBottomGradient];
   CABasicAnimation *gradientFadeInAnimation = [self createFadeInAnimation];
@@ -243,10 +270,10 @@ static NSString *const statusKeyPath = @"status";
   [textLayer addAnimation:pulse forKey:@"scale"];
   [textLayer displayIfNeeded];
   
-  [parentLayer addSublayer:gradientLayer];
-  [parentLayer addSublayer:displayNameLayer];
-  [parentLayer addSublayer:textLayer];
-  [parentLayer addSublayer:_overlayLayer];
+  [_overlayLayer addSublayer:blueSquare];
+  [_overlayLayer addSublayer:gradientLayer];
+  [_overlayLayer addSublayer:displayNameLayer];
+  [_overlayLayer addSublayer:textLayer];
   
   return parentLayer;
 }
@@ -321,6 +348,18 @@ static NSString *const statusKeyPath = @"status";
   
   // TODO : does this help match the export?
   _playerItem.videoComposition = _mainCompositionInst;
+  
+  if (_playerItem.customVideoCompositor) {
+    if ([_playerItem.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
+      NSLog(@"YES IT IS THE RIGHT CLASS");
+      CLPThemeCompositor *comp = (id)_playerItem.customVideoCompositor;
+      [comp setCALayer:_overlayLayer];
+    } else {
+      NSLog(@"NO IT IS NOT THE RIGHT CLASS");
+    }
+  } else {
+    NSLog(@"NO CLASS AT ALL");
+  }
 }
 
 - (void)setPaused:(BOOL)paused {
@@ -371,6 +410,7 @@ static NSString *const statusKeyPath = @"status";
   parentLayer.geometryFlipped = YES;
 
   _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithPostProcessingAsVideoLayer:videoLayer inLayer:parentLayer];
+  
   
   AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPreset1280x720];
 //  [compositionData setObject:exporter forKey:@"exportSession"];
@@ -462,7 +502,11 @@ static NSString *const statusKeyPath = @"status";
     [_videoTracks addObject:_videoTrack];
     
     AVMutableVideoCompositionLayerInstruction *videolayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:_videoTrack];
-    [videolayerInstruction setOpacity:0.0 atTime:nextLastEndTime];
+    if ([videos lastObject] != video) {
+      [videolayerInstruction setOpacity:0.0 atTime:nextLastEndTime];
+    
+    }
+    
     [videolayerInstruction setTransform:first_videoTrack.preferredTransform atTime:lastEndTime];
     [videolayerInstructions addObject:videolayerInstruction];
     
@@ -470,14 +514,17 @@ static NSString *const statusKeyPath = @"status";
   }
   
   AVMutableVideoCompositionInstruction *mainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
+//  NSMutableArray *allVideoTrackIDs = [NSMutableArray array];
+  
+  
   mainInstruction.timeRange = CMTimeRangeMake(kCMTimeZero, lastEndTime);
   mainInstruction.layerInstructions = videolayerInstructions;
   
   _mainCompositionInst = [AVMutableVideoComposition videoComposition];
   _mainCompositionInst.customVideoCompositorClass = [CLPThemeCompositor class];
-
+  
   _mainCompositionInst.renderSize = CGSizeMake(720.0, 1280.0);
-
+  
   _mainCompositionInst.instructions = @[mainInstruction];
   _mainCompositionInst.frameDuration = CMTimeMake(1, 30);
 }

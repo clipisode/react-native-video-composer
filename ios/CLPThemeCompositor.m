@@ -1,12 +1,20 @@
 #import "CLPThemeCompositor.h"
 #import <CoreVideo/CoreVideo.h>
 #import <CoreImage/CoreImage.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <Accelerate/Accelerate.h>
 
 @implementation CLPThemeCompositor
+{
+  CALayer *_layer;
+}
 
 - (instancetype)init {
     return self;
+}
+
+- (void)setCALayer:(CALayer *)layer {
+  _layer = layer;
 }
 
 - (void)processPixelBuffer: (CVImageBufferRef)pixelBuffer {
@@ -35,54 +43,82 @@
 - (void)startVideoCompositionRequest:(AVAsynchronousVideoCompositionRequest *)request {
   CVPixelBufferRef destination = [request.renderContext newPixelBuffer];
   
+  CMPersistentTrackID lastTrackId = [[[request sourceTrackIDs] lastObject] intValue];
+  CVPixelBufferRef bottom = [request sourceFrameByTrackID:lastTrackId];
   
-  
-  if (request.sourceTrackIDs.count == 2) {
-//        CVPixelBufferRef front = [request sourceFrameByTrackID:1];
-//        CVPixelBufferRef back = [request sourceFrameByTrackID:2];
-//        CVPixelBufferLockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
-//        CVPixelBufferLockBaseAddress(back, kCVPixelBufferLock_ReadOnly);
-//        CVPixelBufferLockBaseAddress(destination, 0);
-//        [self renderFrontBuffer:front backBuffer:back toBuffer:destination];
-//        CVPixelBufferUnlockBaseAddress(destination, 0);
-//        CVPixelBufferUnlockBaseAddress(back, kCVPixelBufferLock_ReadOnly);
-//        CVPixelBufferUnlockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
+  if (bottom != NULL) {
+    CIImage *img = [CIImage imageWithCVPixelBuffer:bottom];
+    
+    AVMutableVideoCompositionInstruction *instruction = (id)request.videoCompositionInstruction;
+    
+    for (AVMutableVideoCompositionLayerInstruction *layerInstruction in instruction.layerInstructions) {
+      if (layerInstruction.trackID == lastTrackId) {
+        CGAffineTransform transform;
+        [layerInstruction getTransformRampForTime:request.compositionTime startTransform:&transform endTransform:NULL timeRange:NULL];
+        
+        img = [img imageByApplyingTransform:transform];
+      }
+    }
+    
+    img = [img imageByApplyingFilter:@"CIAffineClamp"];
+    img = [img imageByApplyingFilter:@"CIGaussianBlur"];
+    
+    [[CIContext context] render:img toCVPixelBuffer:destination];
+    
+    // TRY THIS
+  //  get reference to CALayer
+  //  CALayer *layer;
+  //  layer.name to identify with theme elements
+    
+    
+  //  if (request.sourceTrackIDs.count == 2) {
+  //        CVPixelBufferRef front = [request sourceFrameByTrackID:1];
+  //        CVPixelBufferRef back = [request sourceFrameByTrackID:2];
+  //        CVPixelBufferLockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
+  //        CVPixelBufferLockBaseAddress(back, kCVPixelBufferLock_ReadOnly);
+  //        CVPixelBufferLockBaseAddress(destination, 0);
+  //        [self renderFrontBuffer:front backBuffer:back toBuffer:destination];
+  //        CVPixelBufferUnlockBaseAddress(destination, 0);
+  //        CVPixelBufferUnlockBaseAddress(back, kCVPixelBufferLock_ReadOnly);
+  //        CVPixelBufferUnlockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
+  //  }
+    
+    // my test gray scale code
+    
+    // The request will only have a single item in sourceTrackIDs when there is only one video track at the current time.
+    // When there are overlapping video frames, this will have each of those frame IDs
+    
+    
+    
+  //  OSType format = CVPixelBufferGetPixelFormatType(front);
+  //  NSLog(@"firstTrackId=%ld", (unsigned long)request.sourceTrackIDs.count);
+
+  //                        CVPixelBufferLockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
+                          CVPixelBufferLockBaseAddress(destination, 0);
+
+  //  [self grayscale:front destination:destination];
+  //
+  //                          void *ydestPlane = CVPixelBufferGetBaseAddressOfPlane(destination, 0);
+  //                          void *ysrcPlane = CVPixelBufferGetBaseAddressOfPlane(front, 0);
+  //                          memcpy(ydestPlane, ysrcPlane, CVPixelBufferGetBytesPerRowOfPlane(front, 0) * CVPixelBufferGetHeightOfPlane(front, 0));
+
+  //  void *uvdestPlane = CVPixelBufferGetBaseAddressOfPlane(destination, 1);
+  //  void *uvsrcPlane = CVPixelBufferGetBaseAddressOfPlane(front, 1);
+  //  memcpy(uvdestPlane, uvsrcPlane, CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 1) * CVPixelBufferGetHeightOfPlane(pixelBuffer, 1))
+
+  //                            [self processPixelBuffer:destination];
+
+                              CVPixelBufferUnlockBaseAddress(destination, 0);
+  //                            CVPixelBufferUnlockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
+    
+    // end test gray scale my code
+    
+    
+    [request finishWithComposedVideoFrame:destination];
+    CVBufferRelease(destination);
+  } else {
+    [request finishCancelledRequest];
   }
-  
-  // my test gray scale code
-  
-  // The request will only have a single item in sourceTrackIDs when there is only one video track at the current time.
-  // When there are overlapping video frames, this will have each of those frame IDs
-  CMPersistentTrackID firstTrackID = [[[request sourceTrackIDs] firstObject] intValue];
-  
-  CVPixelBufferRef front = [request sourceFrameByTrackID:firstTrackID];
-  
-//  OSType format = CVPixelBufferGetPixelFormatType(front);
-  NSLog(@"firstTrackId=%ld", (unsigned long)request.sourceTrackIDs.count);
-  
-  CVPixelBufferLockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
-  CVPixelBufferLockBaseAddress(destination, 0);
-
-//  [self grayscale:front destination:destination];
-  
-  void *ydestPlane = CVPixelBufferGetBaseAddressOfPlane(destination, 0);
-  void *ysrcPlane = CVPixelBufferGetBaseAddressOfPlane(front, 0);
-  memcpy(ydestPlane, ysrcPlane, CVPixelBufferGetBytesPerRowOfPlane(front, 0) * CVPixelBufferGetHeightOfPlane(front, 0));
-
-//  void *uvdestPlane = CVPixelBufferGetBaseAddressOfPlane(destination, 1);
-//  void *uvsrcPlane = CVPixelBufferGetBaseAddressOfPlane(front, 1);
-//  memcpy(uvdestPlane, uvsrcPlane, CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 1) * CVPixelBufferGetHeightOfPlane(pixelBuffer, 1))
-
-  [self processPixelBuffer:destination];
-  
-  CVPixelBufferUnlockBaseAddress(destination, 0);
-  CVPixelBufferUnlockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
-  
-  // end test gray scale my code
-  
-  
-  [request finishWithComposedVideoFrame:destination];
-  CVBufferRelease(destination);
 }
 
 - (void)renderContextChanged:(AVVideoCompositionRenderContext *)newRenderContext {
