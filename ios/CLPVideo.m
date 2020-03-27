@@ -24,6 +24,7 @@
   AVSynchronizedLayer *_syncLayer;
   CALayer *_overlayLayer;
   CMTime lastEndTime;
+//  AVMutableCompositionTrack *_videoTrack;
   NSMutableArray *_videoTracks;
   AVMutableCompositionTrack *_audioTrack;
   

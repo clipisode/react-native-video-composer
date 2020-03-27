@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {NativeModules, findNodeHandle, UIManager } from 'react-native';
+import {NativeModules, findNodeHandle } from 'react-native';
 import { requireNativeComponent } from 'react-native';
 
 const CLPCompositionPlayer = requireNativeComponent('CLPCompositionPlayer');
@@ -12,28 +12,19 @@ type Props = {
 };
 
 export const CompositionPlayer = React.forwardRef( ({onProgress, onExportProgress, onLoad, ...props}: Props, ref: any) => {
-  const nativeComponentRef = React.useRef<typeof CLPCompositionPlayer>(null);
+  const compositionPlayerRe = React.useRef<typeof CLPCompositionPlayer>(null);
+  
   React.useImperativeHandle(ref, () => ({
-    seek: (time: number) => {
-      nativeComponentRef.current.setNativeProps({ seek: { time } })
-    },
-    setPlaybackRate: (rate: number) => null, // nativeComponentRef.current.setNativeProps({ rate }),
-    play: () => null,
-    pause: () => null,
-    save: async (outputPath: string) => {
-      return await NativeModules.CLPCompositionPlayerManager.save(
-        outputPath,
-        findNodeHandle(nativeComponentRef.current)
-      );
-    }
-  }))
+    seek: (time: number) => compositionPlayerRe.current.setNativeProps({ seek: { time } }),
+    save: async (outputPath: string) => await NativeModules.CLPCompositionPlayerManager.save(outputPath, findNodeHandle(compositionPlayerRe.current))
+  }));
   
   return (
     <CLPCompositionPlayer
       onVideoLoad={(e: any) => onLoad && onLoad(e.nativeEvent)}
       onVideoProgress={(e: any) => onProgress && onProgress(e.nativeEvent)}
       onExportProgress={(e: any) => onExportProgress && onExportProgress(e.nativeEvent)}
-      ref={nativeComponentRef}
+      ref={compositionPlayerRe}
       {...props} 
     />
   );
