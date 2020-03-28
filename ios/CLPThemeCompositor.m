@@ -37,33 +37,168 @@
     }
 }
 
-// start AVVideoCompositing protocol
+- (void)writeToBuffer:(UIImage *)image buffer:(CVPixelBufferRef)destination {
+  CVPixelBufferLockBaseAddress(destination, 0);
+  
+  void *pixelData = CVPixelBufferGetBaseAddress(destination);
+  
+  CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateDeviceRGB();
+  
+  CGContextRef context = CGBitmapContextCreateWithData(pixelData, image.size.width, image.size.height, 8, CVPixelBufferGetBytesPerRow(destination), rgbColorSpace, kCGImageAlphaNoneSkipFirst, NULL, NULL);
+  
+  CGContextTranslateCTM(context, 0, image.size.height);
+  CGContextScaleCTM(context, 1, -1);
+  
+  UIGraphicsPushContext(context);
+  
+  [image drawInRect:CGRectMake(0, 0, image.size.width, image.size.height)];
+  
+  UIGraphicsPopContext();
+  
+  CVPixelBufferUnlockBaseAddress(destination, 0);
+}
 
+- (void)drawSquare:(CGContextRef)context square:(CGRect)path {
+  UIBezierPath *squarePath = [UIBezierPath bezierPathWithRect:path];
+  
+  
+  [[UIColor blueColor] setFill];
+  
+//  CGContextSetFillColor(context, CGColorGetComponents([UIColor blueColor].CGColor));
+  
+  //CGContextDrawPath(context, CGPathDrawingMode);
+  [squarePath fill];
+}
+
+// start AVVideoCompositing protocol
 
 - (void)startVideoCompositionRequest:(AVAsynchronousVideoCompositionRequest *)request {
   CVPixelBufferRef destination = [request.renderContext newPixelBuffer];
   
+  CGSize destinationSize = CGSizeMake(CVPixelBufferGetWidth(destination), CVPixelBufferGetHeight(destination));
+  
+  UIGraphicsBeginImageContextWithOptions(destinationSize, TRUE, request.renderContext.renderScale);
+  CGContextRef context = UIGraphicsGetCurrentContext();
+  
+  // ------------------
+  
+  CGGradientRef myGradient;
+  CGColorSpaceRef myColorspace;
+
+  size_t num_locations = 2;
+
+  CGFloat locations[2] = { 0.0, CMTimeGetSeconds(request.compositionTime) / 10.0 };
+  CGFloat components[8] = { 0.894, 0.894, 0.894, 1.0,
+                            0.694, 0.694, 0.694, 1.0};
+
+  myColorspace = CGColorSpaceCreateWithName(kCGColorSpaceGenericRGB);
+  myGradient = CGGradientCreateWithColorComponents(myColorspace, components, locations, num_locations);
+  
+  CGPoint myStartPoint, myEndPoint;
+
+  myStartPoint.x = 0.0;
+  myStartPoint.y = 0.0;
+
+  myEndPoint.x = destinationSize.width;
+  myEndPoint.y = destinationSize.height;
+  
+  CGContextDrawLinearGradient(context, myGradient, myStartPoint, myEndPoint, 0);
+  
+  [self drawSquare:context square:CGRectMake(10.0, 10.0, 500.0, 500.0)];
+  [self drawSquare:context square:CGRectMake(520.0, 10.0, 500.0, 500.0)];
+  
+  UIImage *img = UIGraphicsGetImageFromCurrentImageContext();
+  
+  UIGraphicsEndImageContext();
+  
+  [self writeToBuffer:img buffer:destination];
+//  [img draw]
+//  [CIImage imageWithCGImage:<#(nonnull CGImageRef)#>]
+  
+  CGGradientRelease(myGradient);
+  CGColorSpaceRelease(myColorspace);
+//  CGContextRelease(context);
+  myGradient = NULL;
+  myColorspace = NULL;
+  context = NULL;
+  img = NULL;
+
+  [request finishWithComposedVideoFrame:destination];
+  CVBufferRelease(destination);
+  destination = NULL;
+  
+  // ------------------
+  
+  
+  
+  return;
+  
   CMPersistentTrackID lastTrackId = [[[request sourceTrackIDs] lastObject] intValue];
   CVPixelBufferRef bottom = [request sourceFrameByTrackID:lastTrackId];
   
+  NSLog(@"sourceTrackIDs=%@", request.sourceTrackIDs);
+  
   if (bottom != NULL) {
-    CIImage *img = [CIImage imageWithCVPixelBuffer:bottom];
+    CIImage *img = [CIImage imageWithCVPixelBuffer:bottom options:@{}];
     
-    AVMutableVideoCompositionInstruction *instruction = (id)request.videoCompositionInstruction;
     
-    for (AVMutableVideoCompositionLayerInstruction *layerInstruction in instruction.layerInstructions) {
-      if (layerInstruction.trackID == lastTrackId) {
-        CGAffineTransform transform;
-        [layerInstruction getTransformRampForTime:request.compositionTime startTransform:&transform endTransform:NULL timeRange:NULL];
-        
-        img = [img imageByApplyingTransform:transform];
+    if (lastTrackId != 77) {
+      AVMutableVideoCompositionInstruction *instruction = (id)request.videoCompositionInstruction;
+      
+      for (AVMutableVideoCompositionLayerInstruction *layerInstruction in instruction.layerInstructions) {
+        if (layerInstruction.trackID == lastTrackId) {
+          CGAffineTransform transform;
+          [layerInstruction getTransformRampForTime:request.compositionTime startTransform:&transform endTransform:NULL timeRange:NULL];
+          
+          img = [img imageByApplyingTransform:transform];
+        }
       }
+    
+      img = [img imageByApplyingFilter:@"CIAffineClamp"];
+      img = [img imageByApplyingFilter:@"CIGaussianBlur"];
+
+      img = [img imageByCroppingToRect:CGRectMake(0, 0, 720, 1280)];
     }
+    CIContext *ctx = [CIContext context];
+//
+//    CGImageRef cgimg = [ctx createCGImage:img fromRect:CGRectMake(0.0, 0.0, request.renderContext.size.width, request.renderContext.size.height)];
+//
+//
+//    CGContextDrawLayerAtPoint(cgimg, CGPointMake(0.0, 0.0), <#CGLayerRef  _Nullable layer#>)
     
-    img = [img imageByApplyingFilter:@"CIAffineClamp"];
-    img = [img imageByApplyingFilter:@"CIGaussianBlur"];
+//    CGBitmapContextCreate(NULL, 720, 1280, 8, 0, <#CGColorSpaceRef  _Nullable space#>, <#uint32_t bitmapInfo#>)
     
-    [[CIContext context] render:img toCVPixelBuffer:destination];
+
+//     * CVPixelBufferGetHeightOfPlane(pixelBuffer, 1)
+    
+    
+    
+//    CGContextRef cgcontext = CGBitmapContextCreate(NULL, 720.0, 1280.0, CGImageGetBitsPerPixel(cgimg), CVPixelBufferGetBytesPerRowOfPlane(bottom, 1), CGImageGetColorSpace(cgimg), kCGBitmapAlphaInfoMask);
+    
+//    CGContextSetFillColor(cgcontext, [UIColor blueColor].CGColor);
+    
+//      NSMutableAttributedString *str = [[NSMutableAttributedString alloc] initWithString:@"firstsecondthird"];
+//      [str addAttribute:NSForegroundColorAttributeName value:[UIColor redColor] range:NSMakeRange(0,5)];
+//      [str addAttribute:NSForegroundColorAttributeName value:[UIColor greenColor] range:NSMakeRange(5,6)];
+//      [str addAttribute:NSForegroundColorAttributeName value:[UIColor blueColor] range:NSMakeRange(11,5)];
+//
+//    [str draw
+    
+//    img = [CIImage imageWithCGImage:cgimg];
+    
+    
+    
+    
+    
+    CGRect imgextent = [img extent];
+    
+    size_t bwidth = CVPixelBufferGetWidth(bottom);
+    size_t bheight = CVPixelBufferGetHeight(bottom);
+    
+    size_t width = CVPixelBufferGetWidth(destination);
+    size_t height = CVPixelBufferGetHeight(destination);
+    
+    [ctx render:img toCVPixelBuffer:destination];
     
     // TRY THIS
   //  get reference to CALayer
@@ -94,7 +229,7 @@
   //  NSLog(@"firstTrackId=%ld", (unsigned long)request.sourceTrackIDs.count);
 
   //                        CVPixelBufferLockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
-                          CVPixelBufferLockBaseAddress(destination, 0);
+//                          CVPixelBufferLockBaseAddress(destination, 0);
 
   //  [self grayscale:front destination:destination];
   //
@@ -108,7 +243,7 @@
 
   //                            [self processPixelBuffer:destination];
 
-                              CVPixelBufferUnlockBaseAddress(destination, 0);
+//                              CVPixelBufferUnlockBaseAddress(destination, 0);
   //                            CVPixelBufferUnlockBaseAddress(front, kCVPixelBufferLock_ReadOnly);
     
     // end test gray scale my code

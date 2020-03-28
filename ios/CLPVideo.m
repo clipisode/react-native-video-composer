@@ -5,7 +5,6 @@
 #import <React/RCTComponent.h>
 #import <Photos/Photos.h>
 #import "CLPThemeCompositor.h"
-#import "CLPThemeOverlayLayer.h"
 
 
 @interface CLPVideo : UIView <AVPlayerViewControllerDelegate>
@@ -25,7 +24,6 @@
   NSDictionary *_composition;
   AVMutableVideoComposition *_mainCompositionInst;
   AVSynchronizedLayer *_syncLayer;
-  CALayer *_overlayLayer;
   CMTime lastEndTime;
   NSMutableArray *_videoTracks;
   AVMutableCompositionTrack *_audioTrack;
@@ -168,20 +166,20 @@ static NSString *const statusKeyPath = @"status";
   return fadeInAnimation;
 }
 
-- (CABasicAnimation *)createProgressOverDurationAnimation
-{
-  CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"progress"];
-  
-  NSNumber *duration = _composition[@"duration"];
-  
-  animation.beginTime = AVCoreAnimationBeginTimeAtZero;
-  animation.duration = [duration doubleValue];
-  animation.fromValue = [NSNumber numberWithFloat:0.0f];
-  animation.toValue = [NSNumber numberWithFloat:1.0f];
-  animation.removedOnCompletion = NO;
-  
-  return animation;
-}
+//- (CABasicAnimation *)createProgressOverDurationAnimation
+//{
+//  CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"progress"];
+//
+//  NSNumber *duration = _composition[@"duration"];
+//
+//  animation.beginTime = AVCoreAnimationBeginTimeAtZero;
+//  animation.duration = [duration doubleValue];
+//  animation.fromValue = [NSNumber numberWithFloat:0.0f];
+//  animation.toValue = [NSNumber numberWithFloat:1.0f];
+//  animation.removedOnCompletion = NO;
+//
+//  return animation;
+//}
 
 - (CALayer *)createBottomGradient
 {
@@ -226,7 +224,7 @@ static NSString *const statusKeyPath = @"status";
   return layer;
 }
 
-- (CALayer *)createParentLayer:(CALayer *)videoLayer
+- (CALayer *)createParentLayer:(CALayer *)videoLayer overlay:(CALayer *)overlayLayer
 {
   CALayer *parentLayer = [CALayer layer];
 
@@ -238,13 +236,12 @@ static NSString *const statusKeyPath = @"status";
   
   [parentLayer addSublayer:videoLayer];
   
-  _overlayLayer = [CLPThemeOverlayLayer layer];
-  _overlayLayer.frame = parentLayer.frame;
+  overlayLayer.frame = parentLayer.frame;
   
-  CABasicAnimation *progressOverDurationAnimation = [self createProgressOverDurationAnimation];
-  [_overlayLayer addAnimation:progressOverDurationAnimation forKey:@"progress"];
+//  CABasicAnimation *progressOverDurationAnimation = [self createProgressOverDurationAnimation];
+//  [_overlayLayer addAnimation:progressOverDurationAnimation forKey:@"progress"];
   
-  [parentLayer addSublayer:_overlayLayer];
+  [parentLayer addSublayer:overlayLayer];
   
   // blue box
   CALayer *blueSquare = [CALayer layer];
@@ -270,10 +267,10 @@ static NSString *const statusKeyPath = @"status";
   [textLayer addAnimation:pulse forKey:@"scale"];
   [textLayer displayIfNeeded];
   
-  [_overlayLayer addSublayer:blueSquare];
-  [_overlayLayer addSublayer:gradientLayer];
-  [_overlayLayer addSublayer:displayNameLayer];
-  [_overlayLayer addSublayer:textLayer];
+  [overlayLayer addSublayer:blueSquare];
+  [overlayLayer addSublayer:gradientLayer];
+  [overlayLayer addSublayer:displayNameLayer];
+  [overlayLayer addSublayer:textLayer];
   
   return parentLayer;
 }
@@ -339,7 +336,7 @@ static NSString *const statusKeyPath = @"status";
     
     [self addPlayerTimeObserver];
     
-    CALayer *parentLayer = [self createParentLayer:_playerLayer];
+    CALayer *parentLayer = [self createParentLayer:_playerLayer overlay:[CALayer layer]];
     
     [_syncLayer addSublayer:parentLayer];
   }
@@ -352,8 +349,9 @@ static NSString *const statusKeyPath = @"status";
   if (_playerItem.customVideoCompositor) {
     if ([_playerItem.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
       NSLog(@"YES IT IS THE RIGHT CLASS");
-      CLPThemeCompositor *comp = (id)_playerItem.customVideoCompositor;
-      [comp setCALayer:_overlayLayer];
+//      CLPThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
+      
+      // [themeCompositor setThemeData:themeData];
     } else {
       NSLog(@"NO IT IS NOT THE RIGHT CLASS");
     }
@@ -406,11 +404,12 @@ static NSString *const statusKeyPath = @"status";
   [_player pause];
 
   CALayer *videoLayer = [CALayer layer];
-  CALayer *parentLayer = [self createParentLayer:videoLayer];
+  CALayer *overlayLayer = [CALayer layer];
+  
+  CALayer *parentLayer = [self createParentLayer:videoLayer overlay:overlayLayer];
   parentLayer.geometryFlipped = YES;
 
-  _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithPostProcessingAsVideoLayer:videoLayer inLayer:parentLayer];
-  
+  _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithAdditionalLayer:overlayLayer asTrackID:77];
   
   AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPreset1280x720];
 //  [compositionData setObject:exporter forKey:@"exportSession"];
@@ -512,6 +511,10 @@ static NSString *const statusKeyPath = @"status";
     
     lastEndTime = nextLastEndTime;
   }
+  
+  AVMutableVideoCompositionLayerInstruction *animationLayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstruction];
+  [animationLayerInstruction setTrackID:77];
+  [videolayerInstructions addObject:animationLayerInstruction];
   
   AVMutableVideoCompositionInstruction *mainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
 //  NSMutableArray *allVideoTrackIDs = [NSMutableArray array];
