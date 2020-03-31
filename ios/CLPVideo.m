@@ -236,42 +236,6 @@ static NSString *const statusKeyPath = @"status";
   
   [parentLayer addSublayer:videoLayer];
   
-  overlayLayer.frame = parentLayer.frame;
-  
-//  CABasicAnimation *progressOverDurationAnimation = [self createProgressOverDurationAnimation];
-//  [_overlayLayer addAnimation:progressOverDurationAnimation forKey:@"progress"];
-  
-  [parentLayer addSublayer:overlayLayer];
-  
-  // blue box
-  CALayer *blueSquare = [CALayer layer];
-  blueSquare.frame = CGRectMake(40, 40, 40, 40);
-  blueSquare.backgroundColor = [[UIColor blueColor] CGColor];
-  
-  NSAttributedString *str = [self createBasicString:@"firstsecondthird"];
-  CATextLayer *textLayer = [self createTextLayer:str];
-  
-  textLayer.frame = CGRectMake(80, 80, 300, 200);
-  
-  CABasicAnimation *pulse = [self createPulseAnimation];
-
-  
-  CALayer *gradientLayer = [self createBottomGradient];
-  CABasicAnimation *gradientFadeInAnimation = [self createFadeInAnimation];
-  [gradientLayer addAnimation:gradientFadeInAnimation forKey:@"fadeIn"];
-  
-  CALayer *displayNameLayer = [self createDisplayNameTextLayer:@"Max Schmeling"];
-  displayNameLayer.frame = CGRectMake(0.0, 1100.0, 720.0, 180.0);
-  [displayNameLayer addAnimation:gradientFadeInAnimation forKey:@"fadeIn"];
-  
-  [textLayer addAnimation:pulse forKey:@"scale"];
-  [textLayer displayIfNeeded];
-  
-  [overlayLayer addSublayer:blueSquare];
-  [overlayLayer addSublayer:gradientLayer];
-  [overlayLayer addSublayer:displayNameLayer];
-  [overlayLayer addSublayer:textLayer];
-  
   return parentLayer;
 }
 
@@ -409,10 +373,12 @@ static NSString *const statusKeyPath = @"status";
   CALayer *parentLayer = [self createParentLayer:videoLayer overlay:overlayLayer];
   parentLayer.geometryFlipped = YES;
 
-  _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithAdditionalLayer:overlayLayer asTrackID:77];
+  _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithPostProcessingAsVideoLayer:videoLayer inLayer:parentLayer];
   
   AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPreset1280x720];
 //  [compositionData setObject:exporter forKey:@"exportSession"];
+  
+  
   
   exporter.outputURL = [NSURL URLWithString:outPath];
   exporter.outputFileType = AVFileTypeMPEG4;
@@ -512,9 +478,9 @@ static NSString *const statusKeyPath = @"status";
     lastEndTime = nextLastEndTime;
   }
   
-  AVMutableVideoCompositionLayerInstruction *animationLayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstruction];
-  [animationLayerInstruction setTrackID:77];
-  [videolayerInstructions addObject:animationLayerInstruction];
+//  AVMutableVideoCompositionLayerInstruction *animationLayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstruction];
+//  [animationLayerInstruction setTrackID:77];
+//  [videolayerInstructions addObject:animationLayerInstruction];
   
   AVMutableVideoCompositionInstruction *mainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
 //  NSMutableArray *allVideoTrackIDs = [NSMutableArray array];
