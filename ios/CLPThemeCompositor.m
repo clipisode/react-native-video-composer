@@ -164,7 +164,7 @@
   CGContextDrawImage(context, sourceFrameImage.extent, sourceFrameCGImage);
 
   [self drawGradient:context];
-  [self drawMultilineText:context text:(CFStringRef)@"Max Schmeling"];
+  // [self drawMultilineText:context text:(CFStringRef)@"Max Schmeling"];
   
 //  [self drawSquare:context square:CGRectMake(10.0, 10.0, CMTimeGetSeconds(request.compositionTime) * 100.0, 500.0)];
 //  [self drawSquare:context square:CGRectMake(520.0, 10.0, 500.0, 500.0)];
