@@ -281,8 +281,9 @@ static NSString *const statusKeyPath = @"status";
 {
   _composition = composition;
   
+  NSLog(@"Composition set... %@", composition);
+  
   if (_mixComposition == nil) {
-    
     _mixComposition = [AVMutableComposition composition];
     _playerItem = [AVPlayerItem playerItemWithAsset:_mixComposition];
     
