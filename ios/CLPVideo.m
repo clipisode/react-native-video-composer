@@ -51,8 +51,8 @@ static NSString *const statusKeyPath = @"status";
   [super layoutSubviews];
 
   _syncLayer.frame = self.bounds;
-  _syncLayer.anchorPoint = CGPointMake(0.0, 0.0);
-  _syncLayer.transform = CATransform3DConcat(CATransform3DMakeScale(self.bounds.size.width / 720.0, self.bounds.size.height / 1280.0, 1), CATransform3DMakeTranslation(-self.bounds.size.width / 2, -self.bounds.size.height / 2, 0.0));
+  self.layer.anchorPoint = CGPointMake(0.0, 0.0);
+  self.layer.transform = CATransform3DConcat(CATransform3DMakeScale(self.bounds.size.width / 720.0, self.bounds.size.height / 1280.0, 1), CATransform3DMakeTranslation(-self.bounds.size.width / 2, -self.bounds.size.height / 2, 0.0));
 }
 
 - (void)removeFromSuperview
@@ -127,110 +127,13 @@ static NSString *const statusKeyPath = @"status";
   return str;
 }
 
-- (CATextLayer *)createTextLayer:(NSAttributedString *)attributedString
-{
-  CATextLayer *textLayer = [CATextLayer layer];
-  
-  textLayer.string = attributedString;
-  textLayer.shouldRasterize = true;
-  
-  return textLayer;
-}
-
-- (CABasicAnimation *)createPulseAnimation
-{
-  CABasicAnimation *scaleAnimation = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
-  
-  scaleAnimation.fromValue = [NSNumber numberWithFloat:0.8];
-  scaleAnimation.toValue = [NSNumber numberWithFloat:1.2];
-  scaleAnimation.duration = 3;
-  scaleAnimation.repeatCount = CGFLOAT_MAX;
-  scaleAnimation.autoreverses = YES;
-  scaleAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
-  scaleAnimation.beginTime = AVCoreAnimationBeginTimeAtZero;
-  scaleAnimation.removedOnCompletion = NO;
-  
-  return scaleAnimation;
-}
-
-- (CABasicAnimation *)createFadeInAnimation
-{
-  CABasicAnimation *fadeInAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
-  
-  fadeInAnimation.beginTime = AVCoreAnimationBeginTimeAtZero;
-  fadeInAnimation.duration = 3.0;
-  fadeInAnimation.fromValue = [NSNumber numberWithFloat:0.0f];
-  fadeInAnimation.toValue = [NSNumber numberWithFloat:1.0f];
-  fadeInAnimation.removedOnCompletion = NO;
-  
-  return fadeInAnimation;
-}
-
-//- (CABasicAnimation *)createProgressOverDurationAnimation
-//{
-//  CABasicAnimation *animation = [CABasicAnimation animationWithKeyPath:@"progress"];
-//
-//  NSNumber *duration = _composition[@"duration"];
-//
-//  animation.beginTime = AVCoreAnimationBeginTimeAtZero;
-//  animation.duration = [duration doubleValue];
-//  animation.fromValue = [NSNumber numberWithFloat:0.0f];
-//  animation.toValue = [NSNumber numberWithFloat:1.0f];
-//  animation.removedOnCompletion = NO;
-//
-//  return animation;
-//}
-
-- (CALayer *)createBottomGradient
-{
-  CAGradientLayer *gradientLayer = [CAGradientLayer layer];
-  
-  gradientLayer.frame = CGRectMake(0.0, 980.0, 720.0, 300.0);
-  
-  UIColor *clipisodeBlue = [UIColor greenColor];// [UIColor colorWithRed:52 green:152 blue:219 alpha:1];
-  UIColor *clipisodeBlueTransparent = [clipisodeBlue colorWithAlphaComponent:0];
-  
-  NSArray *colors =  @[
-    (id)clipisodeBlueTransparent.CGColor,
-    (id)clipisodeBlue.CGColor
-  ];
-
-  NSNumber *stopOne = [NSNumber numberWithFloat:0.0];
-  NSNumber *stopTwo = [NSNumber numberWithFloat:0.5];
-  NSNumber *stopFour = [NSNumber numberWithFloat:1.0];
-
-  NSArray *locations = @[ stopOne, stopTwo, stopFour ];
-  
-  gradientLayer.colors = colors;
-  gradientLayer.locations = locations;
-  
-  return gradientLayer;
-}
-
-- (CALayer *)createDisplayNameTextLayer:(NSString *)displayName
-{
-  CATextLayer *layer = [CATextLayer layer];
-  
-  NSMutableAttributedString *attrDisplayName = [[NSMutableAttributedString alloc] initWithString:@"Max Schmeling"];
-  [attrDisplayName addAttribute:NSForegroundColorAttributeName value:[UIColor redColor] range:NSMakeRange(0,3)];
-  [attrDisplayName addAttribute:NSForegroundColorAttributeName value:[UIColor blueColor] range:NSMakeRange(4,9)];
-  
-  UIFont *font = [UIFont fontWithName:@"Arial" size:48];
-  [attrDisplayName addAttribute:NSFontAttributeName value:font range:NSMakeRange(0, 13)];
-
-  layer.string = attrDisplayName;
-  layer.alignmentMode = @"center";
-  
-  return layer;
-}
-
 - (CALayer *)createParentLayer:(CALayer *)videoLayer overlay:(CALayer *)overlayLayer
 {
   CALayer *parentLayer = [CALayer layer];
 
   parentLayer.drawsAsynchronously = NO;
   parentLayer.frame = CGRectMake(0.0, 0.0, 720.0, 1280.0);
-  parentLayer.backgroundColor = [[UIColor purpleColor] CGColor];
+  // parentLayer.backgroundColor = [[UIColor purpleColor] CGColor];
   
   videoLayer.frame = parentLayer.frame;
   
@@ -399,7 +302,6 @@ static NSString *const statusKeyPath = @"status";
         }];
       });
     }
-    
     
     [exporter exportAsynchronouslyWithCompletionHandler:^{
       if (exporter.status == AVAssetExportSessionStatusCompleted) {
