@@ -110,16 +110,16 @@
 
   size_t num_locations = 3;
 
-  UIColor *baseColor = [UIColor colorWithRed:52.0 green:152.0 blue:219.0 alpha:1];
+  UIColor *baseColor = [UIColor colorWithRed:52.0/255.0 green:152.0/255.0 blue:219.0/255.0 alpha:1];
   
   const CGFloat *scc = CGColorGetComponents([baseColor colorWithAlphaComponent:0.0].CGColor);
   const CGFloat *mcc = CGColorGetComponents([baseColor colorWithAlphaComponent:0.8].CGColor);
   const CGFloat *ecc = CGColorGetComponents([baseColor colorWithAlphaComponent:1.0].CGColor);
   
   CGFloat locations[3] = { 0.0, 0.45, 1.0 };
-  CGFloat components[12] = { scc[0]/255.0, scc[1]/255.0, scc[2]/255.0, scc[3],
-                            mcc[0]/255.0, mcc[1]/255.0, mcc[2]/255.0, mcc[3],
-                            ecc[0]/255.0, ecc[1]/255.0, ecc[2]/255.0, ecc[3] };
+  CGFloat components[12] = { scc[0], scc[1], scc[2], scc[3],
+                            mcc[0], mcc[1], mcc[2], mcc[3],
+                            ecc[0], ecc[1], ecc[2], ecc[3] };
   
   CGFloat height = 210.0;
 
@@ -154,13 +154,31 @@
   UIGraphicsPushContext(context);
   CGContextSetAllowsAntialiasing(context, YES);
   
-  CVPixelBufferRef sourceFrame = [request sourceFrameByTrackID:[request.sourceTrackIDs lastObject].intValue];
+  CMPersistentTrackID lastSourceTrackId = [request.sourceTrackIDs lastObject].intValue;
+  CVPixelBufferRef sourceFrame = [request sourceFrameByTrackID:lastSourceTrackId];
   CVPixelBufferLockBaseAddress(sourceFrame, kCVPixelBufferLock_ReadOnly);
   CIImage *sourceFrameImage = [CIImage imageWithCVPixelBuffer:sourceFrame];
   
+  AVMutableVideoCompositionInstruction *mainInstruction = (AVMutableVideoCompositionInstruction *)request.videoCompositionInstruction;
+  for (AVMutableVideoCompositionLayerInstruction* li in mainInstruction.layerInstructions) {
+    if (li.trackID == lastSourceTrackId) {
+      CGAffineTransform startTransform;
+      
+      [li getTransformRampForTime:request.compositionTime startTransform:&startTransform endTransform:NULL timeRange:NULL];
+      
+//      sourceFrameCGImage = [sourceFrameImage imageByApplyingTransform:startTransform].CGImage;
+      if (!CGAffineTransformIsIdentity(startTransform)) {
+        sourceFrameImage = [sourceFrameImage imageByApplyingTransform:CGAffineTransformConcat(startTransform, coordinateTransform)];
+      }
+    }
+  }
+  
   CIContext *cicontext = [CIContext context];
   
+  // draw underlying frame
   CGImageRef sourceFrameCGImage = [cicontext createCGImage:sourceFrameImage fromRect:sourceFrameImage.extent];
+  
+//  [sourceFrameImage imageByApplyingTransform:request.videoCompositionInstruction.];
   CGContextDrawImage(context, sourceFrameImage.extent, sourceFrameCGImage);
 
   [self drawGradient:context];

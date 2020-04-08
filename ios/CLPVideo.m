@@ -280,10 +280,7 @@ static NSString *const statusKeyPath = @"status";
   _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithPostProcessingAsVideoLayer:videoLayer inLayer:parentLayer];
   
   AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPreset1280x720];
-//  [compositionData setObject:exporter forKey:@"exportSession"];
-  
-  
-  
+
   exporter.outputURL = [NSURL URLWithString:outPath];
   exporter.outputFileType = AVFileTypeMPEG4;
 //  exporter.shouldOptimizeForNetworkUse = YES;
@@ -302,6 +299,7 @@ static NSString *const statusKeyPath = @"status";
         }];
       });
     }
+    
     
     [exporter exportAsynchronouslyWithCompletionHandler:^{
       if (exporter.status == AVAssetExportSessionStatusCompleted) {
@@ -336,7 +334,6 @@ static NSString *const statusKeyPath = @"status";
   NSDictionary *composition = _composition;
   // BEGIN COMPOSITION SETUP
   
-//  _videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
   _audioTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeAudio preferredTrackID:kCMPersistentTrackID_Invalid];
   
   lastEndTime = kCMTimeZero;
@@ -349,7 +346,6 @@ static NSString *const statusKeyPath = @"status";
     AVMutableCompositionTrack *_videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
     
     NSString *path = video[@"path"];
-    // NSNumber* startAt = video[@"startAt"];
     
     NSURL *url = [NSURL URLWithString:path];
     AVAsset *asset = [AVURLAsset URLAssetWithURL:url options:@{AVURLAssetPreferPreciseDurationAndTimingKey:@YES}];
@@ -370,25 +366,19 @@ static NSString *const statusKeyPath = @"status";
     [_videoTracks addObject:_videoTrack];
     
     AVMutableVideoCompositionLayerInstruction *videolayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:_videoTrack];
+    
     if ([videos lastObject] != video) {
       [videolayerInstruction setOpacity:0.0 atTime:nextLastEndTime];
-    
     }
-    
+
     [videolayerInstruction setTransform:first_videoTrack.preferredTransform atTime:lastEndTime];
     [videolayerInstructions addObject:videolayerInstruction];
     
     lastEndTime = nextLastEndTime;
   }
   
-//  AVMutableVideoCompositionLayerInstruction *animationLayerInstruction = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstruction];
-//  [animationLayerInstruction setTrackID:77];
-//  [videolayerInstructions addObject:animationLayerInstruction];
-  
   AVMutableVideoCompositionInstruction *mainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
-//  NSMutableArray *allVideoTrackIDs = [NSMutableArray array];
-  
-  
+
   mainInstruction.timeRange = CMTimeRangeMake(kCMTimeZero, lastEndTime);
   mainInstruction.layerInstructions = videolayerInstructions;
   
