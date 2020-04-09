@@ -216,16 +216,10 @@ static NSString *const statusKeyPath = @"status";
   
   if (_playerItem.customVideoCompositor) {
     if ([_playerItem.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
-      NSLog(@"YES IT IS THE RIGHT CLASS");
       CLPThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
       
       [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
-      // [themeCompositor setThemeData:themeData];
-    } else {
-      NSLog(@"NO IT IS NOT THE RIGHT CLASS");
     }
-  } else {
-    NSLog(@"NO CLASS AT ALL");
   }
 }
 
@@ -287,6 +281,14 @@ static NSString *const statusKeyPath = @"status";
 //  exporter.shouldOptimizeForNetworkUse = YES;
   
   exporter.videoComposition = _mainCompositionInst;
+  
+  if (exporter.customVideoCompositor) {
+    if ([exporter.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
+      CLPThemeCompositor *themeCompositor = (id)exporter.customVideoCompositor;
+      
+      [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
+    }
+  }
   
   if (_mixComposition.isExportable) {
     if (self.onExportProgress) {
