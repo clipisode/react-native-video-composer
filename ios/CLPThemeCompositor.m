@@ -6,12 +6,16 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <Accelerate/Accelerate.h>
 
+// We know we're working with kCVPixelFormatType_32BGRA
+const size_t COLOR_COMPONENT_COUNT = 4;
+
 @implementation CLPThemeCompositor
 {
   CGAffineTransform coordinateTransform;
 }
 
 @synthesize theme;
+@synthesize logo;
 
 - (instancetype)init {
   if (self = [super init]) {
@@ -87,21 +91,25 @@
   
   CTFrameDraw(frame, context);
   
+  CGColorRelease(foregroundColor);
   CGPathRelease(framePath);
   CFRelease(frame);
   CFRelease(string);
   CFRelease(frameSetter);
 }
 
-- (void)drawImage:(CGContextRef)context {
-  UIImage *img = [UIImage imageNamed:@"logofortheme.png"];
+- (void)drawLogo:(CGContextRef)context {
+  if (self.logo == NULL) {
+    NSLog(@"logo property is NULL");
+    return;
+  }
   
   CGSize size = CGSizeMake(80.0, 80.0);
-  CGFloat padding = 20.0;
+  CGFloat padding = 30.0;
   
   CGRect rect = CGRectApplyAffineTransform(CGRectMake(720.0 - size.width - padding, padding, size.width, size.height), coordinateTransform);
   
-  CGContextDrawImage(context, rect, img.CGImage);
+  CGContextDrawImage(context, rect, self.logo.CGImage);
 }
 
 - (void)drawGradient:(CGContextRef)context {
@@ -112,14 +120,19 @@
 
   UIColor *baseColor = [UIColor colorWithRed:52.0/255.0 green:152.0/255.0 blue:219.0/255.0 alpha:1];
   
-  const CGFloat *scc = CGColorGetComponents([baseColor colorWithAlphaComponent:0.0].CGColor);
-  const CGFloat *mcc = CGColorGetComponents([baseColor colorWithAlphaComponent:0.8].CGColor);
-  const CGFloat *ecc = CGColorGetComponents([baseColor colorWithAlphaComponent:1.0].CGColor);
+  CGColorRef colorOne = [baseColor colorWithAlphaComponent:0.0].CGColor;
+  CGColorRef colorTwo = [baseColor colorWithAlphaComponent:0.8].CGColor;
+  CGColorRef colorThree = [baseColor colorWithAlphaComponent:1.0].CGColor;
   
+  const CGFloat *scc = CGColorGetComponents(colorOne);
+  const CGFloat *mcc = CGColorGetComponents(colorTwo);
+  const CGFloat *ecc = CGColorGetComponents(colorThree);
+
   CGFloat locations[3] = { 0.0, 0.45, 1.0 };
-  CGFloat components[12] = { scc[0], scc[1], scc[2], scc[3],
-                            mcc[0], mcc[1], mcc[2], mcc[3],
-                            ecc[0], ecc[1], ecc[2], ecc[3] };
+  
+  CGFloat components[COLOR_COMPONENT_COUNT * 3] = { scc[0], scc[1], scc[2], scc[3],
+                                                    mcc[0], mcc[1], mcc[2], mcc[3],
+                                                    ecc[0], ecc[1], ecc[2], ecc[3] };
   
   CGFloat height = 210.0;
 
@@ -138,68 +151,69 @@
   CGColorSpaceRelease(myColorspace);
   myGradient = NULL;
   myColorspace = NULL;
+  colorOne = NULL;
+  colorTwo = NULL;
+  colorThree = NULL;
 }
 
 // start AVVideoCompositing protocol
 
 - (void)startVideoCompositionRequest:(AVAsynchronousVideoCompositionRequest *)request {
   CVPixelBufferRef destination = [request.renderContext newPixelBuffer];
-  CGSize destinationSize = CGSizeMake(CVPixelBufferGetWidth(destination), CVPixelBufferGetHeight(destination));
   
   CVPixelBufferLockBaseAddress(destination, 0);
-  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-  UIGraphicsBeginImageContextWithOptions(destinationSize, YES, request.renderContext.renderScale);
   
-  CGContextRef context = CGBitmapContextCreate(CVPixelBufferGetBaseAddress(destination), destinationSize.width, destinationSize.height, 8, CVPixelBufferGetBytesPerRow(destination), colorSpace, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-  UIGraphicsPushContext(context);
+  CGSize destinationSize = CGSizeMake(CVPixelBufferGetWidth(destination), CVPixelBufferGetHeight(destination));
+  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+  
+  void * destinationBaseAddress = CVPixelBufferGetBaseAddress(destination);
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRow(destination);
+  CGBitmapInfo bitmapInfo = kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst;
+  
+  CGContextRef context = CGBitmapContextCreate(destinationBaseAddress, destinationSize.width, destinationSize.height, 8, bytesPerRow, colorSpace, bitmapInfo);
   CGContextSetAllowsAntialiasing(context, YES);
+  
+  UIGraphicsPushContext(context);
   
   CMPersistentTrackID lastSourceTrackId = [request.sourceTrackIDs lastObject].intValue;
   CVPixelBufferRef sourceFrame = [request sourceFrameByTrackID:lastSourceTrackId];
   CVPixelBufferLockBaseAddress(sourceFrame, kCVPixelBufferLock_ReadOnly);
   CIImage *sourceFrameImage = [CIImage imageWithCVPixelBuffer:sourceFrame];
-  
+
   AVMutableVideoCompositionInstruction *mainInstruction = (AVMutableVideoCompositionInstruction *)request.videoCompositionInstruction;
   for (AVMutableVideoCompositionLayerInstruction* li in mainInstruction.layerInstructions) {
     if (li.trackID == lastSourceTrackId) {
       CGAffineTransform startTransform;
-      
+
       [li getTransformRampForTime:request.compositionTime startTransform:&startTransform endTransform:NULL timeRange:NULL];
-      
-//      sourceFrameCGImage = [sourceFrameImage imageByApplyingTransform:startTransform].CGImage;
+
       if (!CGAffineTransformIsIdentity(startTransform)) {
         sourceFrameImage = [sourceFrameImage imageByApplyingTransform:CGAffineTransformConcat(startTransform, coordinateTransform)];
       }
     }
   }
   
-  CIContext *cicontext = [CIContext context];
-  
+  CIContext *cicontext = [CIContext contextWithCGContext:context options:NULL];
+
   // draw underlying frame
   CGImageRef sourceFrameCGImage = [cicontext createCGImage:sourceFrameImage fromRect:sourceFrameImage.extent];
-  
-//  [sourceFrameImage imageByApplyingTransform:request.videoCompositionInstruction.];
+
   CGContextDrawImage(context, sourceFrameImage.extent, sourceFrameCGImage);
 
   [self drawGradient:context];
-  // [self drawMultilineText:context text:(CFStringRef)@"Max Schmeling"];
+  [self drawLogo:context];
   
-//  [self drawSquare:context square:CGRectMake(10.0, 10.0, CMTimeGetSeconds(request.compositionTime) * 100.0, 500.0)];
-//  [self drawSquare:context square:CGRectMake(520.0, 10.0, 500.0, 500.0)];
-  [self drawImage:context];
-//  [self drawMultilineText:context text:(CFStringRef)@"This is a longer line of text that should wrap."];
+  
+  CGImageRelease(sourceFrameCGImage);
+  CVPixelBufferUnlockBaseAddress(sourceFrame, kCVPixelBufferLock_ReadOnly);
   
   UIGraphicsPopContext();
+  CGContextRelease(context);
   
-  CVPixelBufferUnlockBaseAddress(sourceFrame, kCVPixelBufferLock_ReadOnly);
   CVPixelBufferUnlockBaseAddress(destination, 0);
   
-  CGContextRelease(context);
-  CGImageRelease(sourceFrameCGImage);
-  CGColorSpaceRelease(colorSpace);
-  
   [request finishWithComposedVideoFrame:destination];
-
+  CGColorSpaceRelease(colorSpace);
   CVBufferRelease(destination);
 }
 

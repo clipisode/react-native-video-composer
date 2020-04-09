@@ -217,8 +217,9 @@ static NSString *const statusKeyPath = @"status";
   if (_playerItem.customVideoCompositor) {
     if ([_playerItem.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
       NSLog(@"YES IT IS THE RIGHT CLASS");
-//      CLPThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
+      CLPThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
       
+      [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
       // [themeCompositor setThemeData:themeData];
     } else {
       NSLog(@"NO IT IS NOT THE RIGHT CLASS");
