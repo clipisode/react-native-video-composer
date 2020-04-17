@@ -219,6 +219,7 @@ static NSString *const statusKeyPath = @"status";
       CLPThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
       
       [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
+      [themeCompositor setComposition:_composition];
     }
   }
 }
@@ -287,6 +288,7 @@ static NSString *const statusKeyPath = @"status";
       CLPThemeCompositor *themeCompositor = (id)exporter.customVideoCompositor;
       
       [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
+      [themeCompositor setComposition:_composition];
     }
   }
   

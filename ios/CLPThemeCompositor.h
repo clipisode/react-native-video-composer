@@ -4,5 +4,6 @@
 
 @property (nonatomic, retain) NSString *theme;
 @property (nonatomic, retain) UIImage *logo;
+@property (nonatomic, retain) NSDictionary *composition;
 
 @end
