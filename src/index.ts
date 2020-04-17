@@ -1,1 +1,1 @@
-export {  CompositionPlayer } from './CompositionPlayer';
+export { CompositionPlayer } from './CompositionPlayer';

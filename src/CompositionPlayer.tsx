@@ -8,15 +8,16 @@ type Props = {
   onProgress: (e: { currentTime: number }) => void;
   onLoad: (e: { duration: number }) => void;
   onExportProgress: (e: { progress: number }) => void;
-  paused?: boolean
+  paused?: boolean;
+  composition: any;
 };
 
 export const CompositionPlayer = React.forwardRef( ({onProgress, onExportProgress, onLoad, ...props}: Props, ref: any) => {
-  const compositionPlayerRe = React.useRef<typeof CLPCompositionPlayer>(null);
+  const compositionPlayerRef = React.useRef<typeof CLPCompositionPlayer>(null);
   
   React.useImperativeHandle(ref, () => ({
-    seek: (time: number) => compositionPlayerRe.current.setNativeProps({ seek: { time } }),
-    save: async (outputPath: string) => await NativeModules.CLPCompositionPlayerManager.save(outputPath, findNodeHandle(compositionPlayerRe.current))
+    seek: (time: number) => compositionPlayerRef.current.setNativeProps({ seek: { time } }),
+    save: async (outputPath: string) => await NativeModules.CLPCompositionPlayerManager.save(outputPath, findNodeHandle(compositionPlayerRef.current))
   }));
   
   return (
@@ -24,7 +25,7 @@ export const CompositionPlayer = React.forwardRef( ({onProgress, onExportProgres
       onVideoLoad={(e: any) => onLoad && onLoad(e.nativeEvent)}
       onVideoProgress={(e: any) => onProgress && onProgress(e.nativeEvent)}
       onExportProgress={(e: any) => onExportProgress && onExportProgress(e.nativeEvent)}
-      ref={compositionPlayerRe}
+      ref={compositionPlayerRef}
       {...props} 
     />
   );
