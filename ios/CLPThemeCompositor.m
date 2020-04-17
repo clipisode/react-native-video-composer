@@ -16,6 +16,7 @@ const size_t COLOR_COMPONENT_COUNT = 4;
 
 @synthesize theme;
 @synthesize logo;
+@synthesize composition;
 
 - (instancetype)init {
   if (self = [super init]) {
@@ -203,6 +204,26 @@ const size_t COLOR_COMPONENT_COUNT = 4;
   [self drawGradient:context];
   [self drawLogo:context];
   
+  if (self.composition != NULL) {
+    NSArray *elements = self.composition[@"elements"];
+
+    for (NSDictionary* element in elements) {
+      NSNumber *from = (NSNumber *)element[@"from"];
+      NSNumber *to = (NSNumber *)element[@"to"];
+      NSString *type = (NSString *)element[@"type"];
+
+      CMTime fromTime = CMTimeMakeWithSeconds([from floatValue], 1000);
+      CMTime toTime = CMTimeMakeWithSeconds([to floatValue], 1000);
+
+      if (CMTimeCompare(request.compositionTime, fromTime) >= 0 && CMTimeCompare(request.compositionTime, toTime) <= 0) {
+        if ([type isEqualToString:@"displayName"]) {
+          NSString *value = (NSString *)element[@"value"];
+
+          [self drawMultilineText:context text:(CFStringRef)value];
+        }
+      }
+    }
+  }
   
   CGImageRelease(sourceFrameCGImage);
   CVPixelBufferUnlockBaseAddress(sourceFrame, kCVPixelBufferLock_ReadOnly);
