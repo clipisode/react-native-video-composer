@@ -309,16 +309,19 @@ static NSString *const statusKeyPath = @"status";
     [exporter exportAsynchronouslyWithCompletionHandler:^{
       if (exporter.status == AVAssetExportSessionStatusCompleted) {
         dispatch_async(dispatch_get_main_queue(), ^{
-          [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-            [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:exporter.outputURL];
-          } completionHandler:^(BOOL success, NSError * _Nullable error) {
-            if (error != nil) {
-              reject(@"ExportError", error.localizedDescription, error);
-            } else {
-              resolve(nil);
-            }
-          }];
+          resolve(NULL);
         });
+//        dispatch_async(dispatch_get_main_queue(), ^{
+//          [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+//            [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:exporter.outputURL];
+//          } completionHandler:^(BOOL success, NSError * _Nullable error) {
+//            if (error != nil) {
+//              reject(@"ExportError", error.localizedDescription, error);
+//            } else {
+//              resolve(nil);
+//            }
+//          }];
+//        });
       } else if (exporter.status == AVAssetExportSessionStatusFailed) {
         dispatch_async(dispatch_get_main_queue(), ^{
           if (exporter.error) {
