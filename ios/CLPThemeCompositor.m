@@ -25,14 +25,6 @@ static CGAffineTransform coordinateTransform;
   coordinateTransform = CGAffineTransformScale(CGAffineTransformTranslate(CGAffineTransformIdentity, 0, 1280.0), 1, -1);
 }
 
-- (instancetype)init {
-  if (self = [super init]) {
-    
-  }
-  
-  return self;
-}
-
 - (nullable SEL)selectorForElementType:(NSString *)elementType {
   if ([elementType isEqualToString:@"rect"]) {
     return @selector(draw_rect:props:);
@@ -68,12 +60,14 @@ static CGAffineTransform coordinateTransform;
   NSString *fontName = (NSString *)props[@"fontName"];
   NSNumber *fontSize = (NSNumber *)props[@"fontSize"];
   NSString *color = (NSString *)props[@"color"];
+  NSString *textAlign = (NSString *)props[@"textAlign"];
   
   // Apply default values
   if (alpha == NULL) alpha = @1.0;
   if (fontName == NULL) fontName = @"Open Sans";
   if (fontSize == NULL) fontSize = @44.0;
   if (color == NULL) color = @"#FFFFFF";
+  if (textAlign == NULL) textAlign = @"left";
   
   // TODO: Can we check the validity of fontName?
   
@@ -81,15 +75,16 @@ static CGAffineTransform coordinateTransform;
   CTFontRef font = CTFontCreateWithFontDescriptor(descriptor, 0.0, NULL);
   CGColorRef foregroundColor = [CLPThemeCompositor getUIColorObjectFromHexString:color alpha:alpha].CGColor;
 
-//  CGFloat leading = 25.0;
-  CTTextAlignment alignment = kCTTextAlignmentCenter; // just for test purposes
+  CTTextAlignment alignment = kCTTextAlignmentLeft;
+  
+  if ([textAlign isEqualToString:@"center"]) alignment = kCTTextAlignmentCenter;
+  else if ([textAlign isEqualToString:@"right"]) alignment = kCTTextAlignmentRight;
+  else if ([textAlign isEqualToString:@"justified"]) alignment = kCTTextAlignmentJustified;
+  else if ([textAlign isEqualToString:@"natural"]) alignment = kCTTextAlignmentNatural;
+  
   const CTParagraphStyleSetting styleSettings[] = {
-//      {kCTParagraphStyleSpecifierLineSpacingAdjustment, sizeof(CGFloat), &leading},
-      {kCTParagraphStyleSpecifierAlignment, sizeof(CTTextAlignment), &alignment}
+    {kCTParagraphStyleSpecifierAlignment, sizeof(CTTextAlignment), &alignment}
   };
-//  CFStringRef settingKeys[] = { kCTParagraphStyleSpecifierAlignment };
-//  CFTypeRef settingValues[] = { kCTTextAlignmentCenter };
-//  CFDictionaryRef settings = CFDictionaryCreate(kCFAllocatorDefault, (const void**)&settingKeys, (const void**)&settingValues, sizeof(settingKeys) / sizeof(settingKeys[0]), &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
   
   CTParagraphStyleRef paragraphStyle = CTParagraphStyleCreate(styleSettings, 1);
   
@@ -105,7 +100,7 @@ static CGAffineTransform coordinateTransform;
   CTFramesetterRef frameSetter = CTFramesetterCreateWithAttributedString(attrString);
   
   CGMutablePathRef framePath = CGPathCreateMutable();
-  CGRect frameRect = [CLPThemeCompositor rectFromProps:props withModifier:NULL]; // CGRectApplyAffineTransform(CGRectMake(20, 1280 - 210, 720 - 20, 1280 - 20), coordinateTransform);
+  CGRect frameRect = [CLPThemeCompositor rectFromProps:props withModifier:NULL];
   CGPathAddRect(framePath, NULL, frameRect);
   
   CFRange currentRange = CFRangeMake(0, 0);
@@ -117,37 +112,7 @@ static CGAffineTransform coordinateTransform;
   CGColorRelease(foregroundColor);
   CGPathRelease(framePath);
   CFRelease(frame);
-  // CFRelease(string);
   CFRelease(frameSetter);
-}
-
-// This is a standard way to pull x/y/width/height values from props and create a
-// CGRect which is commonly used for positioning elements. The modifier parameter
-// is there to support having multiple rectangle configs in the case that some draw
-// functions need that. This is necessary because the props must be flat key/value
-// pairs instead of nested objects to allow for simpler animation (preventing
-// base value mutation during animation).
-+ (CGRect)rectFromProps:(NSDictionary *)props withModifier:(nullable NSString *)modifier {
-  NSString *xKey = @"x";
-  NSString *yKey = @"y";
-  NSString *widthKey = @"width";
-  NSString *heightKey = @"height";
-  
-  if (modifier != NULL) {
-    xKey = [modifier stringByAppendingString:xKey];
-    yKey = [modifier stringByAppendingString:yKey];
-    widthKey = [modifier stringByAppendingString:widthKey];
-    heightKey = [modifier stringByAppendingString:heightKey];
-  }
-  
-  NSNumber *x = (NSNumber *)props[@"x"];
-  NSNumber *y = (NSNumber *)props[@"y"];
-  NSNumber *width = (NSNumber *)props[@"width"];
-  NSNumber *height = (NSNumber *)props[@"height"];
-  
-  CGRect rect = CGRectMake(x.floatValue, y.floatValue, width.floatValue, height.floatValue);
-  
-  return CGRectApplyAffineTransform(rect, coordinateTransform);
 }
 
 - (void)draw_image:(CGContextRef)context props:(NSDictionary *)props {
@@ -227,6 +192,36 @@ static CGAffineTransform coordinateTransform;
   colorThree = NULL;
 }
 
+
+// This is a standard way to pull x/y/width/height values from props and create a
+// CGRect which is commonly used for positioning elements. The modifier parameter
+// is there to support having multiple rectangle configs in the case that some draw
+// functions need that. This is necessary because the props must be flat key/value
+// pairs instead of nested objects to allow for simpler animation (preventing
+// base value mutation during animation).
++ (CGRect)rectFromProps:(NSDictionary *)props withModifier:(nullable NSString *)modifier {
+  NSString *xKey = @"x";
+  NSString *yKey = @"y";
+  NSString *widthKey = @"width";
+  NSString *heightKey = @"height";
+  
+  if (modifier != NULL) {
+    xKey = [modifier stringByAppendingString:xKey];
+    yKey = [modifier stringByAppendingString:yKey];
+    widthKey = [modifier stringByAppendingString:widthKey];
+    heightKey = [modifier stringByAppendingString:heightKey];
+  }
+  
+  NSNumber *x = (NSNumber *)props[@"x"];
+  NSNumber *y = (NSNumber *)props[@"y"];
+  NSNumber *width = (NSNumber *)props[@"width"];
+  NSNumber *height = (NSNumber *)props[@"height"];
+  
+  CGRect rect = CGRectMake(x.floatValue, y.floatValue, width.floatValue, height.floatValue);
+  
+  return CGRectApplyAffineTransform(rect, coordinateTransform);
+}
+
 + (UIColor *)getUIColorObjectFromHexString:(NSString *)hexStr alpha:(NSNumber *)alpha
 {
   // Convert hex string to an integer
@@ -265,51 +260,6 @@ static CGAffineTransform coordinateTransform;
   [[UIColor blackColor] setFill];
   
   [backgroundPath fill];
-}
-
-- (void)drawMultilineText:(CGContextRef)context text:(CFStringRef)string {
-  CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithNameAndSize((CFStringRef)@"Open Sans", 85.0);
-    CTFontRef font = CTFontCreateWithFontDescriptor(descriptor, 0.0, NULL);
-    CGColorRef foregroundColor = [UIColor whiteColor].CGColor;
-
-  //  CGFloat leading = 25.0;
-    CTTextAlignment alignment = kCTTextAlignmentLeft; // just for test purposes
-    const CTParagraphStyleSetting styleSettings[] = {
-  //      {kCTParagraphStyleSpecifierLineSpacingAdjustment, sizeof(CGFloat), &leading},
-        {kCTParagraphStyleSpecifierAlignment, sizeof(CTTextAlignment), &alignment}
-    };
-  //  CFStringRef settingKeys[] = { kCTParagraphStyleSpecifierAlignment };
-  //  CFTypeRef settingValues[] = { kCTTextAlignmentCenter };
-  //  CFDictionaryRef settings = CFDictionaryCreate(kCFAllocatorDefault, (const void**)&settingKeys, (const void**)&settingValues, sizeof(settingKeys) / sizeof(settingKeys[0]), &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    
-    CTParagraphStyleRef paragraphStyle = CTParagraphStyleCreate(styleSettings, 1);
-    
-    CFRelease(descriptor);
-
-    CFStringRef keys[] = { kCTFontAttributeName, kCTForegroundColorAttributeName, kCTParagraphStyleAttributeName };
-    CFTypeRef values[] = { font, foregroundColor, paragraphStyle };
-
-    CFDictionaryRef attributes = CFDictionaryCreate(kCFAllocatorDefault, (const void**)&keys, (const void**)&values, sizeof(keys) / sizeof(keys[0]), &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-
-    CFAttributedStringRef attrString = CFAttributedStringCreate(kCFAllocatorDefault, string, attributes);
-    
-    CTFramesetterRef frameSetter = CTFramesetterCreateWithAttributedString(attrString);
-    
-    CGMutablePathRef framePath = CGPathCreateMutable();
-    CGRect frameRect= CGRectApplyAffineTransform(CGRectMake(40, 320, 450, 1280 - 400), coordinateTransform);
-    CGPathAddRect(framePath, NULL, frameRect);
-    
-    CFRange currentRange = CFRangeMake(0, 0);
-    
-    CTFrameRef frame = CTFramesetterCreateFrame(frameSetter, currentRange, framePath, NULL);
-    
-    CTFrameDraw(frame, context);
-    
-    CGColorRelease(foregroundColor);
-    CGPathRelease(framePath);
-    CFRelease(frame);
-    CFRelease(string);
-    CFRelease(frameSetter);
 }
 
 - (BOOL)isTimeInRange:(CMTime)time from:(CMTime)from to:(CMTime)to {
