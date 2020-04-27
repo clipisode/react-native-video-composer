@@ -219,6 +219,7 @@ static NSString *const statusKeyPath = @"status";
       CLPThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
       
       [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
+      [themeCompositor setTextLogo:[UIImage imageNamed:@"textlogofortheme.png"]];
       [themeCompositor setComposition:_composition];
     }
   }
@@ -279,6 +280,7 @@ static NSString *const statusKeyPath = @"status";
 
   exporter.outputURL = [NSURL URLWithString:outPath];
   exporter.outputFileType = AVFileTypeMPEG4;
+//  exporter.audioMix.
 //  exporter.shouldOptimizeForNetworkUse = YES;
   
   exporter.videoComposition = _mainCompositionInst;
@@ -288,6 +290,7 @@ static NSString *const statusKeyPath = @"status";
       CLPThemeCompositor *themeCompositor = (id)exporter.customVideoCompositor;
       
       [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
+      [themeCompositor setTextLogo:[UIImage imageNamed:@"textlogofortheme.png"]];
       [themeCompositor setComposition:_composition];
     }
   }
@@ -295,7 +298,7 @@ static NSString *const statusKeyPath = @"status";
   if (_mixComposition.isExportable) {
     if (self.onExportProgress) {
       dispatch_async(dispatch_get_main_queue(), ^{
-        NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer * _Nonnull timer) {
+        [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer * _Nonnull timer) {
           if (exporter.status == AVAssetExportSessionStatusExporting) {
             self.onExportProgress(@{@"progress": [NSNumber numberWithFloat:exporter.progress]});
           } else if (exporter.status == AVAssetExportSessionStatusCompleted) {
@@ -337,6 +340,47 @@ static NSString *const statusKeyPath = @"status";
   }
 }
 
+- (void)addFirstFrame:(AVAssetTrack *)videoTrack forDuration:(CMTime)duration videolayerInstructions:(NSMutableArray *)videolayerInstructions {
+  AVMutableCompositionTrack *_startTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+  
+  CMTimeRange frameOneTimeRange = CMTimeRangeMake(kCMTimeZero, CMTimeMake(1, 30));
+  
+  [_startTrack insertTimeRange:frameOneTimeRange ofTrack:videoTrack atTime:lastEndTime error:NULL];
+  [_startTrack scaleTimeRange:_startTrack.timeRange toDuration:duration];
+  [_videoTracks addObject:_startTrack];
+  
+  AVMutableVideoCompositionLayerInstruction *vli = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:_startTrack];
+  
+  [vli setOpacity:0.0 atTime:duration];
+
+  [vli setTransform:videoTrack.preferredTransform atTime:kCMTimeZero];
+  [videolayerInstructions addObject:vli];
+
+  lastEndTime = CMTimeAdd(lastEndTime, duration);
+}
+
+- (void)addLastFrame:(AVAssetTrack *)videoTrack forDuration:(CMTime)duration videolayerInstructions:(NSMutableArray *)videolayerInstructions {
+  AVMutableCompositionTrack *_startTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+  
+    CMTimeRange lastFrame = CMTimeRangeMake(
+                                            CMTimeSubtract(videoTrack.timeRange.duration, CMTimeMake(1, 30)),
+                                            CMTimeMake(1, 30)
+                                            );
+  
+    [_startTrack insertTimeRange:lastFrame ofTrack:videoTrack atTime:lastEndTime error:NULL];
+    [_startTrack scaleTimeRange:CMTimeRangeMake(lastEndTime, CMTimeMake(1, 30)) toDuration:duration];
+    [_videoTracks addObject:_startTrack];
+    
+    AVMutableVideoCompositionLayerInstruction *vli = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:_startTrack];
+    
+//    [vli setOpacity:0.0 atTime:duration];
+  
+    [vli setTransform:videoTrack.preferredTransform atTime:kCMTimeZero];
+    [videolayerInstructions addObject:vli];
+    
+    lastEndTime = CMTimeAdd(lastEndTime, duration);
+}
+
 - (void)load
 {
   NSDictionary *composition = _composition;
@@ -350,9 +394,9 @@ static NSString *const statusKeyPath = @"status";
   
   NSMutableArray *videolayerInstructions = [NSMutableArray array];
   
+  BOOL first = YES;
+  
   for (NSDictionary* video in videos) {
-    AVMutableCompositionTrack *_videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
-    
     NSString *path = video[@"path"];
     
     NSURL *url = [NSURL URLWithString:path];
@@ -362,13 +406,26 @@ static NSString *const statusKeyPath = @"status";
     NSArray* asset_videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
     AVAssetTrack* first_videoTrack = asset_videoTracks[0];
     
+    if (first) {
+      [self addFirstFrame:first_videoTrack forDuration:CMTimeMake(2, 1) videolayerInstructions:videolayerInstructions];
+    }
+    
+    AVMutableCompositionTrack *_videoTrack = [_mixComposition addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+    
+    
     [_videoTrack insertTimeRange:first_videoTrack.timeRange ofTrack:first_videoTrack atTime:lastEndTime error:NULL];
 
     // Add audio
     NSArray* asset_audioTracks = [asset tracksWithMediaType:AVMediaTypeAudio];
     AVAssetTrack* first_audioTrack = asset_audioTracks[0];
-    [_audioTrack insertTimeRange:first_videoTrack.timeRange ofTrack:first_audioTrack atTime:lastEndTime error:nil];
-          
+//    [_audioTrack insertTimeRange:first_videoTrack.timeRange ofTrack:first_audioTrack atTime:lastEndTime error:nil];
+    if (first) {
+      [_audioTrack insertTimeRange:first_videoTrack.timeRange ofTrack:first_audioTrack atTime:kCMTimeZero error:nil];
+      [_audioTrack insertEmptyTimeRange:CMTimeRangeMake(kCMTimeZero, CMTimeMake(60, 30))  ];
+    } else {
+      [_audioTrack insertTimeRange:first_videoTrack.timeRange ofTrack:first_audioTrack atTime:lastEndTime error:nil];
+    }
+    
     CMTime nextLastEndTime = CMTimeAdd(lastEndTime, first_videoTrack.timeRange.duration);
     
     [_videoTracks addObject:_videoTrack];
@@ -383,7 +440,19 @@ static NSString *const statusKeyPath = @"status";
     [videolayerInstructions addObject:videolayerInstruction];
     
     lastEndTime = nextLastEndTime;
+    
+    if (!first) {
+      [self addLastFrame:first_videoTrack forDuration:CMTimeMake(5, 1) videolayerInstructions:videolayerInstructions];
+    }
+    
+    first = NO;
   }
+  
+//  AVMutableCompositionTrack *vt = [_videoTracks lastObject];
+//  CMTime lastFrameDuration = CMTimeMake(301, 30);
+//  CMTimeRange lastFrameRange = CMTimeRangeMake(CMTimeSubtract(vt.timeRange.duration, CMTimeMake(1, 30)), CMTimeMake(1, 30));
+//  [vt scaleTimeRange:lastFrameRange toDuration:lastFrameDuration];
+//  [vt insertEmptyTimeRange:CMTimeRangeMake(lastEndTime, CMTimeMakeWithSeconds(2, 1))];
   
   AVMutableVideoCompositionInstruction *mainInstruction = [AVMutableVideoCompositionInstruction videoCompositionInstruction];
 

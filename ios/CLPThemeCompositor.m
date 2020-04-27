@@ -11,53 +11,75 @@ const size_t COLOR_COMPONENT_COUNT = 4;
 
 @implementation CLPThemeCompositor
 {
-  CGAffineTransform coordinateTransform;
+  
 }
+
+static CGAffineTransform coordinateTransform;
 
 @synthesize theme;
 @synthesize logo;
+@synthesize textLogo;
 @synthesize composition;
+
++ (void)initialize {
+  coordinateTransform = CGAffineTransformScale(CGAffineTransformTranslate(CGAffineTransformIdentity, 0, 1280.0), 1, -1);
+}
 
 - (instancetype)init {
   if (self = [super init]) {
-    coordinateTransform = CGAffineTransformScale(CGAffineTransformTranslate(CGAffineTransformIdentity, 0, 1280.0), 1, -1);
+    
   }
   
   return self;
 }
 
-- (void)writeToBuffer:(UIImage *)image buffer:(CVPixelBufferRef)destination {
-  CVPixelBufferLockBaseAddress(destination, 0);
+- (nullable SEL)selectorForElementType:(NSString *)elementType {
+  if ([elementType isEqualToString:@"rect"]) {
+    return @selector(draw_rect:props:);
+  } else if ([elementType isEqualToString:@"text"]) {
+    return @selector(draw_text:props:);
+  } else if ([elementType isEqualToString:@"image"]) {
+    return @selector(draw_image:props:);
+  } else if ([elementType isEqualToString:@"gradient"]) {
+    return @selector(draw_gradient:props:);
+  }
   
-  void *pixelData = CVPixelBufferGetBaseAddress(destination);
-  
-  CGImageRef cgimg = image.CGImage;
-  CGColorSpaceRef rgbColorSpace = CGImageGetColorSpace(cgimg);
-  CGImageAlphaInfo alphaInfo = CGImageGetAlphaInfo(cgimg);
-  
-  CGContextRef context = CGBitmapContextCreateWithData(pixelData, image.size.width, image.size.height, 8, CVPixelBufferGetBytesPerRow(destination), rgbColorSpace, alphaInfo, NULL, NULL);
-  
-  UIGraphicsPushContext(context);
-  
-  [image drawInRect:CGRectMake(0, 0, image.size.width, image.size.height)];
-  
-  UIGraphicsPopContext();
-  
-  CVPixelBufferUnlockBaseAddress(destination, 0);
+  return NULL;
 }
 
-- (void)drawSquare:(CGContextRef)context square:(CGRect)path {
-  UIBezierPath *squarePath = [UIBezierPath bezierPathWithRect:CGRectApplyAffineTransform(path, coordinateTransform)];
+- (void)draw_rect:(CGContextRef)context props:(NSDictionary *)props {
+  NSString *color = (NSString *)props[@"color"];
+  NSNumber *alpha = (NSNumber *)props[@"alpha"];
+  CGRect rect = [CLPThemeCompositor rectFromProps:props withModifier:NULL];
   
-  [[UIColor blueColor] setFill];
+  if (alpha == NULL) alpha = @1.0;
   
-  [squarePath fill];
+  UIBezierPath *rectBezierPath = [UIBezierPath bezierPathWithRect:rect];
+  UIColor *fillColor = [CLPThemeCompositor getUIColorObjectFromHexString:color alpha:alpha];
+  
+  [fillColor setFill];
+  
+  [rectBezierPath fill];
 }
 
-- (void)drawMultilineText:(CGContextRef)context text:(CFStringRef)string {
-  CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithNameAndSize((CFStringRef)@"Open Sans", 44.0);
+- (void)draw_text:(CGContextRef)context props:(NSDictionary *)props {
+  NSString *value = (NSString *)props[@"value"];
+  NSNumber *alpha = (NSNumber *)props[@"alpha"];
+  NSString *fontName = (NSString *)props[@"fontName"];
+  NSNumber *fontSize = (NSNumber *)props[@"fontSize"];
+  NSString *color = (NSString *)props[@"color"];
+  
+  // Apply default values
+  if (alpha == NULL) alpha = @1.0;
+  if (fontName == NULL) fontName = @"Open Sans";
+  if (fontSize == NULL) fontSize = @44.0;
+  if (color == NULL) color = @"#FFFFFF";
+  
+  // TODO: Can we check the validity of fontName?
+  
+  CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithNameAndSize((CFStringRef)fontName, fontSize.floatValue);
   CTFontRef font = CTFontCreateWithFontDescriptor(descriptor, 0.0, NULL);
-  CGColorRef foregroundColor = [UIColor whiteColor].CGColor;
+  CGColorRef foregroundColor = [CLPThemeCompositor getUIColorObjectFromHexString:color alpha:alpha].CGColor;
 
 //  CGFloat leading = 25.0;
   CTTextAlignment alignment = kCTTextAlignmentCenter; // just for test purposes
@@ -78,12 +100,12 @@ const size_t COLOR_COMPONENT_COUNT = 4;
 
   CFDictionaryRef attributes = CFDictionaryCreate(kCFAllocatorDefault, (const void**)&keys, (const void**)&values, sizeof(keys) / sizeof(keys[0]), &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
-  CFAttributedStringRef attrString = CFAttributedStringCreate(kCFAllocatorDefault, string, attributes);
+  CFAttributedStringRef attrString = CFAttributedStringCreate(kCFAllocatorDefault, (CFStringRef)value, attributes);
   
   CTFramesetterRef frameSetter = CTFramesetterCreateWithAttributedString(attrString);
   
   CGMutablePathRef framePath = CGPathCreateMutable();
-  CGRect frameRect= CGRectApplyAffineTransform(CGRectMake(20, 1280 - 210, 720 - 20, 1280 - 20), coordinateTransform);
+  CGRect frameRect = [CLPThemeCompositor rectFromProps:props withModifier:NULL]; // CGRectApplyAffineTransform(CGRectMake(20, 1280 - 210, 720 - 20, 1280 - 20), coordinateTransform);
   CGPathAddRect(framePath, NULL, frameRect);
   
   CFRange currentRange = CFRangeMake(0, 0);
@@ -95,25 +117,72 @@ const size_t COLOR_COMPONENT_COUNT = 4;
   CGColorRelease(foregroundColor);
   CGPathRelease(framePath);
   CFRelease(frame);
-  CFRelease(string);
+  // CFRelease(string);
   CFRelease(frameSetter);
 }
 
-- (void)drawLogo:(CGContextRef)context {
-  if (self.logo == NULL) {
-    NSLog(@"logo property is NULL");
-    return;
+// This is a standard way to pull x/y/width/height values from props and create a
+// CGRect which is commonly used for positioning elements. The modifier parameter
+// is there to support having multiple rectangle configs in the case that some draw
+// functions need that. This is necessary because the props must be flat key/value
+// pairs instead of nested objects to allow for simpler animation (preventing
+// base value mutation during animation).
++ (CGRect)rectFromProps:(NSDictionary *)props withModifier:(nullable NSString *)modifier {
+  NSString *xKey = @"x";
+  NSString *yKey = @"y";
+  NSString *widthKey = @"width";
+  NSString *heightKey = @"height";
+  
+  if (modifier != NULL) {
+    xKey = [modifier stringByAppendingString:xKey];
+    yKey = [modifier stringByAppendingString:yKey];
+    widthKey = [modifier stringByAppendingString:widthKey];
+    heightKey = [modifier stringByAppendingString:heightKey];
   }
   
-  CGSize size = CGSizeMake(80.0, 80.0);
-  CGFloat padding = 30.0;
+  NSNumber *x = (NSNumber *)props[@"x"];
+  NSNumber *y = (NSNumber *)props[@"y"];
+  NSNumber *width = (NSNumber *)props[@"width"];
+  NSNumber *height = (NSNumber *)props[@"height"];
   
-  CGRect rect = CGRectApplyAffineTransform(CGRectMake(720.0 - size.width - padding, padding, size.width, size.height), coordinateTransform);
+  CGRect rect = CGRectMake(x.floatValue, y.floatValue, width.floatValue, height.floatValue);
   
-  CGContextDrawImage(context, rect, self.logo.CGImage);
+  return CGRectApplyAffineTransform(rect, coordinateTransform);
 }
 
-- (void)drawGradient:(CGContextRef)context {
+- (void)draw_image:(CGContextRef)context props:(NSDictionary *)props {
+  NSNumber *alpha = (NSNumber *)props[@"alpha"];
+  NSString *imageKey = (NSString *)props[@"imageKey"];
+  CGRect rect = [CLPThemeCompositor rectFromProps:props withModifier:NULL];
+  
+  // Apply default values
+  if (alpha == NULL) alpha = @1.0;
+  
+  UIImage *image = NULL;
+  
+  if ([imageKey isEqualToString:@"logo"]) image = self.logo;
+  if ([imageKey isEqualToString:@"textlogo"]) image = self.textLogo;
+  
+  // TODO: 👆 'logo' and 'textlogo' are provided by the app bundle.
+  // This is where we'll add support for other images provided by
+  // the theme and downloaded by the application at runtime.
+  
+  if (image == NULL) {
+    NSLog(@"Image not found for key: '%@'", imageKey);
+  } else {
+    CGContextSaveGState(context);
+    CGContextSetAlpha(context, alpha.floatValue);
+    CGContextDrawImage(context, rect, image.CGImage);
+    CGContextRestoreGState(context);
+  }
+}
+
+- (void)draw_gradient:(CGContextRef)context props:(NSDictionary *)props {
+  NSNumber *alpha = (NSNumber *)props[@"alpha"];
+  
+  // TODO: 👆 alpha is the only supported prop right now to support fading in/out.
+  // This needs to be updated to support colors, locations, and path.
+  
   CGGradientRef myGradient;
   CGColorSpaceRef myColorspace;
 
@@ -145,6 +214,7 @@ const size_t COLOR_COMPONENT_COUNT = 4;
   
   CGContextSaveGState(context);
   CGContextClipToRect(context, CGRectApplyAffineTransform(CGRectMake(0, 1280.0 - height, 720, 1280), coordinateTransform));
+  CGContextSetAlpha(context, alpha.floatValue);
   CGContextDrawLinearGradient(context, myGradient, myStartPoint, myEndPoint, 0);
   CGContextRestoreGState(context);
   
@@ -155,6 +225,141 @@ const size_t COLOR_COMPONENT_COUNT = 4;
   colorOne = NULL;
   colorTwo = NULL;
   colorThree = NULL;
+}
+
++ (UIColor *)getUIColorObjectFromHexString:(NSString *)hexStr alpha:(NSNumber *)alpha
+{
+  // Convert hex string to an integer
+  unsigned int hexint = [CLPThemeCompositor intFromHexString:hexStr];
+
+  // Create a color object, specifying alpha as well
+  UIColor *color =
+    [UIColor colorWithRed:((CGFloat) ((hexint & 0xFF0000) >> 16))/255
+                    green:((CGFloat) ((hexint & 0xFF00) >> 8))/255
+                     blue:((CGFloat) (hexint & 0xFF))/255
+                    alpha:alpha.floatValue];
+
+  return color;
+}
+
++ (unsigned int)intFromHexString:(NSString *)hexStr
+{
+  unsigned int hexInt = 0;
+
+  // Create scanner
+  NSScanner *scanner = [NSScanner scannerWithString:hexStr];
+
+  // Tell scanner to skip the # character
+  [scanner setCharactersToBeSkipped:[NSCharacterSet characterSetWithCharactersInString:@"#"]];
+
+  // Scan hex value
+  [scanner scanHexInt:&hexInt];
+
+  return hexInt;
+}
+
+- (void) drawBackground:(CGContextRef)context {
+  CGRect path = CGRectMake(0.0, 0.0, 720.0, 1280.0);
+  UIBezierPath *backgroundPath = [UIBezierPath bezierPathWithRect:path];
+  
+  [[UIColor blackColor] setFill];
+  
+  [backgroundPath fill];
+}
+
+- (void)drawMultilineText:(CGContextRef)context text:(CFStringRef)string {
+  CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithNameAndSize((CFStringRef)@"Open Sans", 85.0);
+    CTFontRef font = CTFontCreateWithFontDescriptor(descriptor, 0.0, NULL);
+    CGColorRef foregroundColor = [UIColor whiteColor].CGColor;
+
+  //  CGFloat leading = 25.0;
+    CTTextAlignment alignment = kCTTextAlignmentLeft; // just for test purposes
+    const CTParagraphStyleSetting styleSettings[] = {
+  //      {kCTParagraphStyleSpecifierLineSpacingAdjustment, sizeof(CGFloat), &leading},
+        {kCTParagraphStyleSpecifierAlignment, sizeof(CTTextAlignment), &alignment}
+    };
+  //  CFStringRef settingKeys[] = { kCTParagraphStyleSpecifierAlignment };
+  //  CFTypeRef settingValues[] = { kCTTextAlignmentCenter };
+  //  CFDictionaryRef settings = CFDictionaryCreate(kCFAllocatorDefault, (const void**)&settingKeys, (const void**)&settingValues, sizeof(settingKeys) / sizeof(settingKeys[0]), &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    
+    CTParagraphStyleRef paragraphStyle = CTParagraphStyleCreate(styleSettings, 1);
+    
+    CFRelease(descriptor);
+
+    CFStringRef keys[] = { kCTFontAttributeName, kCTForegroundColorAttributeName, kCTParagraphStyleAttributeName };
+    CFTypeRef values[] = { font, foregroundColor, paragraphStyle };
+
+    CFDictionaryRef attributes = CFDictionaryCreate(kCFAllocatorDefault, (const void**)&keys, (const void**)&values, sizeof(keys) / sizeof(keys[0]), &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+    CFAttributedStringRef attrString = CFAttributedStringCreate(kCFAllocatorDefault, string, attributes);
+    
+    CTFramesetterRef frameSetter = CTFramesetterCreateWithAttributedString(attrString);
+    
+    CGMutablePathRef framePath = CGPathCreateMutable();
+    CGRect frameRect= CGRectApplyAffineTransform(CGRectMake(40, 320, 450, 1280 - 400), coordinateTransform);
+    CGPathAddRect(framePath, NULL, frameRect);
+    
+    CFRange currentRange = CFRangeMake(0, 0);
+    
+    CTFrameRef frame = CTFramesetterCreateFrame(frameSetter, currentRange, framePath, NULL);
+    
+    CTFrameDraw(frame, context);
+    
+    CGColorRelease(foregroundColor);
+    CGPathRelease(framePath);
+    CFRelease(frame);
+    CFRelease(string);
+    CFRelease(frameSetter);
+}
+
+- (BOOL)isTimeInRange:(CMTime)time from:(CMTime)from to:(CMTime)to {
+  return CMTimeCompare(time, from) >= 0 && CMTimeCompare(time, to) <= 0;
+}
+
+- (NSNumber *)tween:(CMTime)time fromValue:(NSNumber *)fromValue toValue:(NSNumber *)toValue startTime:(NSNumber *)startTime endTime:(NSNumber *)endTime {
+
+  CMTime animFromTime = CMTimeMake(startTime.floatValue * 1000, 1000);
+  CMTime animToTime = CMTimeMake(endTime.floatValue * 1000, 1000);
+
+  CMTime animDuration = CMTimeSubtract(animToTime, animFromTime);
+  CMTime animProgress = CMTimeSubtract(time, animFromTime);
+  float progress =  CMTimeGetSeconds(animProgress) / CMTimeGetSeconds(animDuration);
+    
+  float newValue = fromValue.floatValue + ((toValue.floatValue - fromValue.floatValue) * progress);
+    
+  return [NSNumber numberWithFloat:newValue];
+}
+
+// This functionality adapted from: https://stackoverflow.com/a/20058585
+- (void)draw:(SEL)selector context:(CGContextRef)context props:(NSDictionary *)props {
+  IMP imp = [self methodForSelector:selector];
+  
+  void (*drawElement)(id, SEL, CGContextRef, NSDictionary *) = (void *)imp;
+  
+  drawElement(self, selector, context, props);
+}
+
+- (NSDictionary *)tweenAll:(NSDictionary *)props with:(nullable NSArray *)animations at:(CMTime)time {
+  if (animations == NULL) return props;
+  
+  NSMutableDictionary *finalProps = [NSMutableDictionary dictionaryWithDictionary:props];
+  
+  for (NSDictionary *animation in animations) {
+    NSString *field = (NSString *)animation[@"field"];
+    NSNumber *startAt = (NSNumber *)animation[@"startAt"];
+    NSNumber *endAt = (NSNumber *)animation[@"endAt"];
+    NSNumber *fromValue = (NSNumber *)animation[@"from"];
+    NSNumber *toValue = (NSNumber *)animation[@"to"];
+
+    CMTime animFromTime = CMTimeMake(startAt.floatValue * 1000, 1000);
+    CMTime animToTime = CMTimeMake(endAt.floatValue * 1000, 1000);
+
+    if ([self isTimeInRange:time from:animFromTime to:animToTime]) {
+      finalProps[field] = [self tween:time fromValue:fromValue toValue:toValue startTime:startAt endTime:endAt];
+    }
+  }
+  
+  return finalProps;
 }
 
 // start AVVideoCompositing protocol
@@ -196,30 +401,37 @@ const size_t COLOR_COMPONENT_COUNT = 4;
   
   CIContext *cicontext = [CIContext contextWithCGContext:context options:NULL];
 
+  // This will draw a solid color over the current buffer to prevent old image data from showing
+  // through on frames where we don't draw over every pixel. This is necessary because of optimizations
+  // in AVFoundation that cause pixel buffers to be reused for multiple compositor rendering requests.
+  [self drawBackground:context];
+  
   // draw underlying frame
   CGImageRef sourceFrameCGImage = [cicontext createCGImage:sourceFrameImage fromRect:sourceFrameImage.extent];
-
   CGContextDrawImage(context, sourceFrameImage.extent, sourceFrameCGImage);
 
-  [self drawGradient:context];
-  [self drawLogo:context];
-  
   if (self.composition != NULL) {
     NSArray *elements = self.composition[@"elements"];
 
     for (NSDictionary* element in elements) {
-      NSNumber *from = (NSNumber *)element[@"from"];
-      NSNumber *to = (NSNumber *)element[@"to"];
+      NSNumber *startAt = (NSNumber *)element[@"startAt"];
+      NSNumber *endAt = (NSNumber *)element[@"endAt"];
       NSString *type = (NSString *)element[@"type"];
+      NSDictionary *props = (NSDictionary *)element[@"props"];
 
-      CMTime fromTime = CMTimeMakeWithSeconds([from floatValue], 1000);
-      CMTime toTime = CMTimeMakeWithSeconds([to floatValue], 1000);
+      CMTime fromTime = CMTimeMakeWithSeconds(startAt.floatValue, 1000);
+      CMTime toTime = CMTimeMakeWithSeconds(endAt.floatValue, 1000);
 
-      if (CMTimeCompare(request.compositionTime, fromTime) >= 0 && CMTimeCompare(request.compositionTime, toTime) <= 0) {
-        if ([type isEqualToString:@"displayName"]) {
-          NSString *value = (NSString *)element[@"value"];
-
-          [self drawMultilineText:context text:(CFStringRef)value];
+      if ([self isTimeInRange:request.compositionTime from:fromTime to:toTime]) {
+        SEL selector = [self selectorForElementType:type];
+        
+        if (selector != NULL) {
+          NSArray *animations = (NSArray *)[element valueForKey:@"animations"];
+          NSDictionary *animatedProps = [self tweenAll:props with:animations at:request.compositionTime];
+          
+          [self draw:selector context:context props:animatedProps];
+        } else {
+          NSLog(@"Selector not found for element type '%@'.", type);
         }
       }
     }
@@ -239,7 +451,7 @@ const size_t COLOR_COMPONENT_COUNT = 4;
 }
 
 - (void)renderContextChanged:(AVVideoCompositionRenderContext *)newRenderContext {
-  NSLog(@"RENDER CONTEXT CHANGED");
+   NSLog(@"RENDER CONTEXT CHANGED");
 }
 
 - (NSDictionary *)requiredPixelBufferAttributesForRenderContext {
