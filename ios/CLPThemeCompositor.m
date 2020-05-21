@@ -6,6 +6,7 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <Accelerate/Accelerate.h>
 
+
 // We know we're working with kCVPixelFormatType_32BGRA
 const size_t COLOR_COMPONENT_COUNT = 4;
 
@@ -17,8 +18,9 @@ const size_t COLOR_COMPONENT_COUNT = 4;
 static CGAffineTransform coordinateTransform;
 
 @synthesize theme;
+@synthesize icon;
 @synthesize logo;
-@synthesize textLogo;
+@synthesize arrow;
 @synthesize composition;
 
 + (void)initialize {
@@ -42,32 +44,62 @@ static CGAffineTransform coordinateTransform;
 - (void)draw_rect:(CGContextRef)context props:(NSDictionary *)props {
   NSString *color = (NSString *)props[@"color"];
   NSNumber *alpha = (NSNumber *)props[@"alpha"];
+  NSNumber *cornerRadius = (NSNumber *)props[@"cornerRadius"];
+  NSString *strokeColor = (NSString *)props[@"strokeColor"];
+  NSNumber *strokeAlpha = (NSNumber *)props[@"strokeAlpha"];
+  NSNumber *strokeWidth = (NSNumber *)props[@"strokeWidth"];
   CGRect rect = [CLPThemeCompositor rectFromProps:props withModifier:NULL];
   
   if (alpha == NULL) alpha = @1.0;
-  
-  UIBezierPath *rectBezierPath = [UIBezierPath bezierPathWithRect:rect];
+  if (cornerRadius == NULL) cornerRadius = @0.0;
+
+  CGFloat floatRadius = [cornerRadius doubleValue];
+  UIBezierPath *rectBezierPath = [UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:floatRadius];
+  // UIBezierPath *rectBezierPath = [UIBezierPath bezierPathWithRect:rect];
   UIColor *fillColor = [CLPThemeCompositor getUIColorObjectFromHexString:color alpha:alpha];
-  
+
   [fillColor setFill];
   
   [rectBezierPath fill];
+
+  if (strokeWidth > 0) {
+    NSNumber *width = (NSNumber *)props[@"width"];
+    NSNumber *height = (NSNumber *)props[@"height"];
+    NSNumber *x = (NSNumber *)props[@"x"];
+    NSNumber *y = (NSNumber *)props[@"y"];
+    CGFloat uiStrokeWidth = [strokeWidth doubleValue];
+    CGRect strokeRect = CGRectMake(x.floatValue - uiStrokeWidth/2, y.floatValue - uiStrokeWidth/2, width.floatValue + uiStrokeWidth, height.floatValue + uiStrokeWidth);
+    UIBezierPath *strokeRectBezierPath = [UIBezierPath bezierPathWithRoundedRect:strokeRect cornerRadius:floatRadius + uiStrokeWidth/2];
+    if (strokeAlpha == NULL) strokeAlpha = @1.0;
+    if (strokeColor == NULL) strokeColor = @"#000000";
+    UIColor *uiStrokeColor = [CLPThemeCompositor getUIColorObjectFromHexString:strokeColor alpha:strokeAlpha];
+    [uiStrokeColor setStroke];
+    strokeRectBezierPath.lineWidth = uiStrokeWidth;
+    [strokeRectBezierPath stroke];
+  }
 }
 
-- (void)draw_text:(CGContextRef)context props:(NSDictionary *)props {
+- (void)draw_text:(CGContextRef)context props:(NSMutableDictionary *)props {
   NSString *value = (NSString *)props[@"value"];
   NSNumber *alpha = (NSNumber *)props[@"alpha"];
   NSString *fontName = (NSString *)props[@"fontName"];
   NSNumber *fontSize = (NSNumber *)props[@"fontSize"];
   NSString *color = (NSString *)props[@"color"];
   NSString *textAlign = (NSString *)props[@"textAlign"];
+  NSString *originY = (NSString *)props[@"originY"];
+  NSNumber *width = (NSNumber *)props[@"width"];
+  NSNumber *height = (NSNumber *)props[@"height"];
+  NSNumber *x = (NSNumber *)props[@"x"];
+  NSNumber *y = (NSNumber *)props[@"y"];
   
   // Apply default values
+  if (value == NULL) value = @"";
   if (alpha == NULL) alpha = @1.0;
   if (fontName == NULL) fontName = @"Open Sans";
   if (fontSize == NULL) fontSize = @44.0;
   if (color == NULL) color = @"#FFFFFF";
   if (textAlign == NULL) textAlign = @"left";
+  if (originY == NULL) originY = @"top";
   
   // TODO: Can we check the validity of fontName?
   
@@ -99,11 +131,23 @@ static CGAffineTransform coordinateTransform;
   
   CTFramesetterRef frameSetter = CTFramesetterCreateWithAttributedString(attrString);
   
+  CFRange currentRange = CFRangeMake(0, 0);
+
+  // vertical align center or bottom?
+  CGSize frameConstraints = CGSizeMake([width floatValue], [height floatValue]);
+  CGSize frameSize = CTFramesetterSuggestFrameSizeWithConstraints(frameSetter, currentRange, NULL, frameConstraints, NULL);
+  if ([originY isEqualToString:@"bottom"]) {
+    float newY = [y floatValue] - frameSize.height;
+    props[@"y"] = @(newY);
+  };
+  if ([originY isEqualToString:@"center"]) {
+    float newY = [y floatValue] - frameSize.height/2;
+    props[@"y"] = @(newY);
+  };
+  
   CGMutablePathRef framePath = CGPathCreateMutable();
   CGRect frameRect = [CLPThemeCompositor rectFromProps:props withModifier:NULL];
   CGPathAddRect(framePath, NULL, frameRect);
-  
-  CFRange currentRange = CFRangeMake(0, 0);
   
   CTFrameRef frame = CTFramesetterCreateFrame(frameSetter, currentRange, framePath, NULL);
   
@@ -125,10 +169,11 @@ static CGAffineTransform coordinateTransform;
   
   UIImage *image = NULL;
   
+  if ([imageKey isEqualToString:@"icon"]) image = self.icon;
   if ([imageKey isEqualToString:@"logo"]) image = self.logo;
-  if ([imageKey isEqualToString:@"textlogo"]) image = self.textLogo;
+  if ([imageKey isEqualToString:@"arrow"]) image = self.arrow;
   
-  // TODO: 👆 'logo' and 'textlogo' are provided by the app bundle.
+  // TODO: 👆 'icon', 'logo' and 'arrow' are provided by the app bundle.
   // This is where we'll add support for other images provided by
   // the theme and downloaded by the application at runtime.
   

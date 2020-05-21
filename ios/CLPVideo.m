@@ -218,8 +218,9 @@ static NSString *const statusKeyPath = @"status";
     if ([_playerItem.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
       CLPThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
       
+      [themeCompositor setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
       [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
-      [themeCompositor setTextLogo:[UIImage imageNamed:@"textlogofortheme.png"]];
+      [themeCompositor setArrow:[UIImage imageNamed:@"swipearrow.png"]];
       [themeCompositor setComposition:_composition];
     }
   }
@@ -289,8 +290,9 @@ static NSString *const statusKeyPath = @"status";
     if ([exporter.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
       CLPThemeCompositor *themeCompositor = (id)exporter.customVideoCompositor;
       
+      [themeCompositor setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
       [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
-      [themeCompositor setTextLogo:[UIImage imageNamed:@"textlogofortheme.png"]];
+      [themeCompositor setArrow:[UIImage imageNamed:@"swipearrow.png"]];
       [themeCompositor setComposition:_composition];
     }
   }
@@ -442,7 +444,7 @@ static NSString *const statusKeyPath = @"status";
     lastEndTime = nextLastEndTime;
     
     if (!first) {
-      [self addLastFrame:first_videoTrack forDuration:CMTimeMake(5, 1) videolayerInstructions:videolayerInstructions];
+      [self addLastFrame:first_videoTrack forDuration:CMTimeMake(3, 1) videolayerInstructions:videolayerInstructions];
     }
     
     first = NO;
