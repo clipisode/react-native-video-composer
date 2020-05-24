@@ -281,6 +281,7 @@ static NSString *const statusKeyPath = @"status";
 
   exporter.outputURL = [NSURL URLWithString:outPath];
   exporter.outputFileType = AVFileTypeMPEG4;
+  // exporter.outputFileType = AVFileTypeQuickTimeMovie;
 //  exporter.audioMix.
 //  exporter.shouldOptimizeForNetworkUse = YES;
   
