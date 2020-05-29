@@ -84,7 +84,7 @@
 // start AVVideoCompositing protocol
 
 - (void)startVideoCompositionRequest:(AVAsynchronousVideoCompositionRequest *)request {
-  NSLog(@"***** STARTED COMP *****");
+//  NSLog(@"***** STARTED COMP *****");
   CVPixelBufferRef destination = [request.renderContext newPixelBuffer];
 // // empty render test lines
 //   [request finishWithComposedVideoFrame:destination];
@@ -169,7 +169,7 @@
   [request finishWithComposedVideoFrame:destination];
   CGColorSpaceRelease(colorSpace);
   CVBufferRelease(destination);
-  NSLog(@"***** ENDED COMP *****");
+//  NSLog(@"***** ENDED COMP *****");
 }
 
 - (void)renderContextChanged:(AVVideoCompositionRenderContext *)newRenderContext {

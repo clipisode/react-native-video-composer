@@ -27,6 +27,7 @@
   CMTime lastEndTime;
   NSMutableArray *_videoTracks;
   AVMutableCompositionTrack *_audioTrack;
+  AVAssetExportSession *_exportSession;
   
   id _timeObserver;
   
@@ -41,6 +42,7 @@ static NSString *const statusKeyPath = @"status";
   if (self = [super init]) {
     _rate = 1.0;
     _videoTracks = [NSMutableArray array];
+    _exportSession = nil;
   }
   
   return self;
@@ -265,10 +267,14 @@ static NSString *const statusKeyPath = @"status";
   [_player setRate:rate];
 }
 
+- (void)cancelExport {
+  if (self->_exportSession != nil) {
+    [self->_exportSession cancelExport];
+  }
+}
+
 - (void)save:(NSString *)outPath resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
 {
-  [_player pause];
-
   CALayer *videoLayer = [CALayer layer];
   CALayer *overlayLayer = [CALayer layer];
   
@@ -277,19 +283,19 @@ static NSString *const statusKeyPath = @"status";
 
   _mainCompositionInst.animationTool = [AVVideoCompositionCoreAnimationTool videoCompositionCoreAnimationToolWithPostProcessingAsVideoLayer:videoLayer inLayer:parentLayer];
   
-  AVAssetExportSession *exporter = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPreset1280x720];
+  _exportSession = [AVAssetExportSession exportSessionWithAsset:_mixComposition presetName:AVAssetExportPreset1280x720];
 
-  exporter.outputURL = [NSURL URLWithString:outPath];
-  exporter.outputFileType = AVFileTypeMPEG4;
+  _exportSession.outputURL = [NSURL URLWithString:outPath];
+  _exportSession.outputFileType = AVFileTypeMPEG4;
   // exporter.outputFileType = AVFileTypeQuickTimeMovie;
 //  exporter.audioMix.
 //  exporter.shouldOptimizeForNetworkUse = YES;
   
-  exporter.videoComposition = _mainCompositionInst;
+  _exportSession.videoComposition = _mainCompositionInst;
   
-  if (exporter.customVideoCompositor) {
-    if ([exporter.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
-      CLPThemeCompositor *themeCompositor = (id)exporter.customVideoCompositor;
+  if (_exportSession.customVideoCompositor) {
+    if ([_exportSession.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
+      CLPThemeCompositor *themeCompositor = (id)_exportSession.customVideoCompositor;
       
       [themeCompositor setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
       [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
@@ -302,40 +308,35 @@ static NSString *const statusKeyPath = @"status";
     if (self.onExportProgress) {
       dispatch_async(dispatch_get_main_queue(), ^{
         [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer * _Nonnull timer) {
-          if (exporter.status == AVAssetExportSessionStatusExporting) {
-            self.onExportProgress(@{@"progress": [NSNumber numberWithFloat:exporter.progress]});
-          } else if (exporter.status == AVAssetExportSessionStatusCompleted) {
+          if (self->_exportSession == nil) {
             [timer invalidate];
+          } else {
+            if (self->_exportSession.status == AVAssetExportSessionStatusExporting) {
+              self.onExportProgress(@{@"progress": [NSNumber numberWithFloat:self->_exportSession.progress]});
+            } else if (self->_exportSession.status == AVAssetExportSessionStatusCompleted) {
+              [timer invalidate];
+            }
           }
         }];
       });
     }
     
     
-    [exporter exportAsynchronouslyWithCompletionHandler:^{
-      if (exporter.status == AVAssetExportSessionStatusCompleted) {
+    [_exportSession exportAsynchronouslyWithCompletionHandler:^{
+      if (self->_exportSession.status == AVAssetExportSessionStatusCompleted) {
         dispatch_async(dispatch_get_main_queue(), ^{
           resolve(NULL);
         });
-//        dispatch_async(dispatch_get_main_queue(), ^{
-//          [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
-//            [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:exporter.outputURL];
-//          } completionHandler:^(BOOL success, NSError * _Nullable error) {
-//            if (error != nil) {
-//              reject(@"ExportError", error.localizedDescription, error);
-//            } else {
-//              resolve(nil);
-//            }
-//          }];
-//        });
-      } else if (exporter.status == AVAssetExportSessionStatusFailed) {
+      } else if (self->_exportSession.status == AVAssetExportSessionStatusFailed) {
         dispatch_async(dispatch_get_main_queue(), ^{
-          if (exporter.error) {
-            reject(@"ExportError", exporter.error.localizedDescription, exporter.error);
+          if (self->_exportSession.error) {
+            reject(@"ExportError", self->_exportSession.error.localizedDescription, self->_exportSession.error);
           } else {
-            reject(@"ExportError", @"Unknown", exporter.error);
+            reject(@"ExportError", @"Unknown", self->_exportSession.error);
           }
         });
+      } else if (self->_exportSession.status == AVAssetExportSessionStatusCancelled) {
+        self->_exportSession = nil;
       }
     }];
   } else {
