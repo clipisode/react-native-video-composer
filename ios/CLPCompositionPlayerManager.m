@@ -40,4 +40,18 @@ RCT_EXPORT_METHOD(save:(NSString *)outPath
     }];
 }
 
+RCT_EXPORT_METHOD(cancelExport:(nonnull NSNumber *)reactTag
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  [self.bridge.uiManager prependUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, CLPVideo *> *viewRegistry) {
+      CLPVideo *view = viewRegistry[reactTag];
+      if (![view isKindOfClass:[CLPVideo class]]) {
+          RCTLogError(@"Invalid view returned from registry, expecting CLPVideo, got: %@", view);
+      } else {
+        [view cancelExport];
+        resolve(nil);
+      }
+  }];
+}
+
 @end

@@ -137,24 +137,16 @@
   CGImageRef sourceFrameCGImage = [cicontext createCGImage:sourceFrameImage fromRect:sourceFrameImage.extent];
   CGContextDrawImage(context, sourceFrameImage.extent, sourceFrameCGImage);
 
-  if (self.composition != NULL && TRUE) {
+  if (self.composition != NULL) {
     NSArray *elements = self.composition[@"elements"];
+    NSArray *teaserElements = self.composition[@"teaserElements"];
 
-    for (NSDictionary* element in elements) {
-      NSNumber *startAt = (NSNumber *)element[@"startAt"];
-      NSNumber *endAt = (NSNumber *)element[@"endAt"];
-      NSString *type = (NSString *)element[@"type"];
-      NSDictionary *props = (NSDictionary *)element[@"props"];
-
-      CMTime fromTime = CMTimeMakeWithSeconds(startAt.floatValue, 1000);
-      CMTime toTime = CMTimeMakeWithSeconds(endAt.floatValue, 1000);
-
-      if ([self isTimeInRange:request.compositionTime from:fromTime to:toTime]) {
-        NSArray *animations = (NSArray *)[element valueForKey:@"animations"];
-        NSDictionary *animatedProps = [self tweenAll:props with:animations at:request.compositionTime];
-          
-        [_painter draw:type context:context props:animatedProps];
-      }
+    if (elements != nil) {
+      [self drawAll:elements atTime:request.compositionTime inContext:context];
+    }
+    
+    if (teaserElements != nil) {
+      [self drawAll:teaserElements atTime:request.compositionTime inContext:context];
     }
   }
   
@@ -172,6 +164,27 @@
 //  NSLog(@"***** ENDED COMP *****");
 }
 
+- (void)drawAll:(NSArray *)elements atTime:(CMTime)compositionTime inContext:(CGContextRef)context {
+  for (NSDictionary* element in elements) {
+    NSNumber *startAt = (NSNumber *)element[@"startAt"];
+    NSNumber *endAt = (NSNumber *)element[@"endAt"];
+    NSString *type = (NSString *)element[@"type"];
+    NSDictionary *props = (NSDictionary *)element[@"props"];
+
+    CMTime fromTime = CMTimeMakeWithSeconds(startAt.floatValue, 1000);
+    CMTime toTime = CMTimeMakeWithSeconds(endAt.floatValue, 1000);
+
+    if ([self isTimeInRange:compositionTime from:fromTime to:toTime]) {
+      NSArray *animations = (NSArray *)[element valueForKey:@"animations"];
+      NSDictionary *animatedProps = [self tweenAll:props with:animations at:compositionTime];
+        
+      // NSLog(@"START type '%@' **********", type);
+      [_painter draw:type context:context props:animatedProps];
+      // NSLog(@"  END type '%@' **********", type);
+    }
+  }
+}
+  
 - (void)renderContextChanged:(AVVideoCompositionRenderContext *)newRenderContext {
    NSLog(@"RENDER CONTEXT CHANGED");
 }
