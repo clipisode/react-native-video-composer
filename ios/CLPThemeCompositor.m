@@ -84,6 +84,11 @@
 // start AVVideoCompositing protocol
 
 - (void)startVideoCompositionRequest:(AVAsynchronousVideoCompositionRequest *)request {
+  // this is the point in the teaser where the video will freeze
+  NSNumber *teaserVideoDurationConfig = self.composition[@"teaserVideoDuration"];
+  
+  CMTime teaserVideoDuration = CMTimeMake([teaserVideoDurationConfig intValue], 1000);
+  
 //  NSLog(@"***** STARTED COMP *****");
   CVPixelBufferRef destination = [request.renderContext newPixelBuffer];
 // // empty render test lines
@@ -142,7 +147,11 @@
     NSArray *teaserElements = self.composition[@"teaserElements"];
 
     if (elements != nil) {
-      [self drawAll:elements atTime:request.compositionTime inContext:context];
+      if (teaserVideoDurationConfig != nil && CMTimeCompare(request.compositionTime, teaserVideoDuration) == 1) {
+        [self drawAll:elements atTime:teaserVideoDuration inContext:context];
+      } else {
+        [self drawAll:elements atTime:request.compositionTime inContext:context];
+      }
     }
     
     if (teaserElements != nil) {

@@ -75,13 +75,31 @@ RCT_EXPORT_METHOD(exportTeaser:(NSString *)outputPath
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 {
-  NSNumber *duration = manifest[@"teaserDuration"];
+  NSNumber *teaserDurationConfig = manifest[@"teaserDuration"];
+  // this is the point in the teaser where the video will freeze
+  NSNumber *teaserVideoDurationConfig = manifest[@"teaserVideoDuration"];
+  
+  
+  if (teaserDurationConfig == nil) {
+    teaserDurationConfig = @10000;
+  }
+  
+  if (teaserVideoDurationConfig == nil) {
+    teaserVideoDurationConfig = @6000;
+  }
   
   CLPCompositionManager *manager = [[CLPCompositionManager alloc] initWithManifest:manifest];
+  CMTime teaserVideoDuration = CMTimeMake([teaserVideoDurationConfig intValue], 1000);
+  [manager cutTo:teaserVideoDuration];
   
   AVAssetExportSession *exportSession = [AVAssetExportSession exportSessionWithAsset:manager.composition presetName:AVAssetExportPreset1280x720];
   
-  exportSession.timeRange = CMTimeRangeMake(kCMTimeZero, CMTimeMake([duration intValue], 1000));
+  
+  CMTime preferredDuration = CMTimeMake([teaserDurationConfig intValue], 1000);
+  CMTime actualDuration = CMTimeMinimum(exportSession.asset.duration, preferredDuration);
+  
+  
+  exportSession.timeRange = CMTimeRangeMake(kCMTimeZero, actualDuration);
   exportSession.outputURL = [NSURL URLWithString:outputPath];
   exportSession.outputFileType = AVFileTypeMPEG4;
    
@@ -97,6 +115,23 @@ RCT_EXPORT_METHOD(exportTeaser:(NSString *)outputPath
       [themeCompositor setComposition:manifest];
     }
   }
+  
+  AVMutableAudioMix *audioMix = [AVMutableAudioMix audioMix];
+  NSMutableArray *paramsArr = [NSMutableArray array];
+  NSArray *audioTracks = [manager.composition tracksWithMediaType:AVMediaTypeAudio];
+  for (AVCompositionTrack *audioTrack in audioTracks) {
+    AVMutableAudioMixInputParameters *params = [AVMutableAudioMixInputParameters audioMixInputParametersWithTrack:audioTrack];
+    params.trackID = audioTrack.trackID;
+    [params setVolume:0.0 atTime:teaserVideoDuration];
+    [paramsArr addObject:params];
+  }
+  audioMix.inputParameters = paramsArr;
+  exportSession.audioMix = audioMix;
+  
+  
+  
+//  [exportSession.audioMix.inputParameters insert = @[params];
+  
   
   [exportSession exportAsynchronouslyWithCompletionHandler:^{
     if (exportSession.status == AVAssetExportSessionStatusCompleted) {
