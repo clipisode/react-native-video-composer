@@ -1,11 +1,9 @@
 #import <AVKit/AVKit.h>
 #import <React/RCTViewManager.h>
 #import <React/RCTUIManager.h>
-#import "CLPThemePainter.h"
 #import <AVFoundation/AVFoundation.h>
 #import <AVKit/AVKit.h>
-#import "CLPThemeCompositor.h"
-#import "CLPCompositionManager.h"
+#import "ReactNativeVideoComposer-Swift.h"
 
 @interface CLPVideoUtil : RCTViewManager <RCTBridgeModule>
 @end
@@ -81,57 +79,36 @@ RCT_EXPORT_METHOD(exportTeaser:(NSString *)outputPath
   
   
   if (teaserDurationConfig == nil) {
-    teaserDurationConfig = @10000;
+    teaserDurationConfig = @10;
   }
   
   if (teaserVideoDurationConfig == nil) {
-    teaserVideoDurationConfig = @6000;
+    teaserVideoDurationConfig = @6;
   }
   
-  CLPCompositionManager *manager = [[CLPCompositionManager alloc] initWithManifest:manifest];
-  CMTime teaserVideoDuration = CMTimeMake([teaserVideoDurationConfig intValue], 1000);
-  [manager cutTo:teaserVideoDuration];
+  CMTime teaserDuration = CMTimeMakeWithSeconds([teaserDurationConfig floatValue], 1000);
   
-  AVAssetExportSession *exportSession = [AVAssetExportSession exportSessionWithAsset:manager.composition presetName:AVAssetExportPreset1280x720];
+  CMTime preferredVideoDuration = CMTimeMakeWithSeconds([teaserVideoDurationConfig floatValue], 1000);
+  // TODO: Get real original composition duration to use actual video duration in export session
+  //  CMTime actualVideoDuration = CMTimeMinimum(manager.composition.duration, preferredVideoDuration);
   
+  CompositionManager *manager = [[CompositionManager alloc] initWithManifest:manifest minDuration:teaserDuration];
+
+  AVAssetExportSession *exportSession = [manager createTeaserExportSessionWithTeaserDuration:teaserDuration teaserVideoDuration:preferredVideoDuration];
   
-  CMTime preferredDuration = CMTimeMake([teaserDurationConfig intValue], 1000);
-  CMTime actualDuration = CMTimeMinimum(exportSession.asset.duration, preferredDuration);
-  
-  
-  exportSession.timeRange = CMTimeRangeMake(kCMTimeZero, actualDuration);
   exportSession.outputURL = [NSURL URLWithString:outputPath];
   exportSession.outputFileType = AVFileTypeMPEG4;
    
   exportSession.videoComposition = manager.videoComposition;
    
   if (exportSession.customVideoCompositor) {
-    if ([exportSession.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
-      CLPThemeCompositor *themeCompositor = (id)exportSession.customVideoCompositor;
-       
-      [themeCompositor setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
-      [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
-      [themeCompositor setArrow:[UIImage imageNamed:@"swipearrow.png"]];
-      [themeCompositor setComposition:manifest];
+    if ([exportSession.customVideoCompositor isKindOfClass:[ThemeCompositor class]]) {
+      ThemeCompositor *themeCompositor = (id)exportSession.customVideoCompositor;
+      
+      [themeCompositor setManifest:manifest];
+      [themeCompositor setManager:manager];
     }
   }
-  
-  AVMutableAudioMix *audioMix = [AVMutableAudioMix audioMix];
-  NSMutableArray *paramsArr = [NSMutableArray array];
-  NSArray *audioTracks = [manager.composition tracksWithMediaType:AVMediaTypeAudio];
-  for (AVCompositionTrack *audioTrack in audioTracks) {
-    AVMutableAudioMixInputParameters *params = [AVMutableAudioMixInputParameters audioMixInputParametersWithTrack:audioTrack];
-    params.trackID = audioTrack.trackID;
-    [params setVolume:0.0 atTime:teaserVideoDuration];
-    [paramsArr addObject:params];
-  }
-  audioMix.inputParameters = paramsArr;
-  exportSession.audioMix = audioMix;
-  
-  
-  
-//  [exportSession.audioMix.inputParameters insert = @[params];
-  
   
   [exportSession exportAsynchronouslyWithCompletionHandler:^{
     if (exportSession.status == AVAssetExportSessionStatusCompleted) {
@@ -169,11 +146,11 @@ RCT_EXPORT_METHOD(generateSticker:(NSString *)outputPath
   CGContextRef context = CGBitmapContextCreate(data, [stickerWidth intValue], [stickerHeight intValue], bitsPerComponent, bytesPerRow, colorSpace, bitmapInfo);
   UIGraphicsPushContext(context);
   
-  CLPThemePainter *painter = [[CLPThemePainter alloc] initWithHeight:stickerHeight];
-  [painter setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
-  [painter setLogo:[UIImage imageNamed:@"logofortheme.png"]];
-  [painter setArrow:[UIImage imageNamed:@"swipearrow.png"]];
-  
+
+  ElementPainter *painter = [[ElementPainter alloc] initWithContext:context
+                                                             height:[stickerHeight longValue]
+                                                            manager:nil];
+
   if (composition != nil) {
     NSArray *elements = composition[@"elements"];
     
@@ -181,7 +158,7 @@ RCT_EXPORT_METHOD(generateSticker:(NSString *)outputPath
       NSString *type = (NSString *)element[@"type"];
       NSDictionary *props = (NSDictionary *)element[@"props"];
       
-      [painter draw:type context:context props:props];
+      [painter drawElementWithType:type element:element props:props at:kCMTimeZero compositionRequest:nil];
     }
   }
   UIGraphicsPopContext();

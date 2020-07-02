@@ -4,8 +4,7 @@
 #import <React/RCTBridgeModule.h>
 #import <React/RCTComponent.h>
 #import <Photos/Photos.h>
-#import "CLPThemeCompositor.h"
-#import "CLPCompositionManager.h"
+#import "ReactNativeVideoComposer-Swift.h"
 
 @interface CLPVideo : UIView <AVPlayerViewControllerDelegate>
 
@@ -22,7 +21,8 @@
   AVPlayerItem *_playerItem;
   NSDictionary *_composition;
   AVAssetExportSession *_exportSession;
-  CLPCompositionManager *_manager;
+  CompositionManager *_manager;
+  AVSynchronizedLayer *_syncLayer;
   
   id _timeObserver;
   
@@ -46,10 +46,11 @@ static NSString *const statusKeyPath = @"status";
 {
   [super layoutSubviews];
 
-//  _playerLayer.frame = self.bounds;
+  _syncLayer.frame = self.bounds;
   self.layer.anchorPoint = CGPointMake(0.0, 0.0);
   self.layer.transform = CATransform3DConcat(CATransform3DMakeScale(self.bounds.size.width / 720.0, self.bounds.size.height / 1280.0, 1), CATransform3DMakeTranslation(-self.bounds.size.width / 2, -self.bounds.size.height / 2, 0.0));
 }
+
 
 - (void)removeFromSuperview
 {
@@ -121,21 +122,6 @@ static NSString *const statusKeyPath = @"status";
   return str;
 }
 
-//- (CALayer *)createParentLayer:(CALayer *)videoLayer overlay:(CALayer *)overlayLayer
-//{
-//  CALayer *parentLayer = [CALayer layer];
-//
-//  parentLayer.drawsAsynchronously = NO;
-//  parentLayer.frame = CGRectMake(0.0, 0.0, 720.0, 1280.0);
-//  // parentLayer.backgroundColor = [[UIColor purpleColor] CGColor];
-//
-//  videoLayer.frame = parentLayer.frame;
-//
-//  [parentLayer addSublayer:videoLayer];
-//
-//  return parentLayer;
-//}
-
 - (void)addPlayerItemObservers
 {
   [_playerItem addObserver:self forKeyPath:statusKeyPath options:0 context:nil];
@@ -179,7 +165,7 @@ static NSString *const statusKeyPath = @"status";
   _composition = composition;
   
   if (_manager == nil) {
-    _manager = [[CLPCompositionManager alloc] initWithManifest:composition];
+    _manager = [[CompositionManager alloc] initWithManifest:composition minDuration:kCMTimeInvalid];
   
     AVComposition *avcomp = _manager.composition;
   
@@ -193,25 +179,40 @@ static NSString *const statusKeyPath = @"status";
     
     _playerLayer.needsDisplayOnBoundsChange = YES;
     _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    _playerLayer.frame = CGRectMake(0.0, 0.0, 720.0, 1280.0);
     
-    [self.layer addSublayer:_playerLayer];
+    _syncLayer = [AVSynchronizedLayer synchronizedLayerWithPlayerItem:_playerItem];
+    [self.layer addSublayer:_syncLayer];
     
     [self addPlayerTimeObserver];
+    
+    CALayer *parentLayer = [self createParentLayer:_playerLayer overlay:[CALayer layer]];
+    
+    [_syncLayer addSublayer:parentLayer];
   }
   
   _playerItem.videoComposition = _manager.videoComposition;
   
   if (_playerItem.customVideoCompositor) {
-    if ([_playerItem.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
-      CLPThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
-      
-      [themeCompositor setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
-      [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
-      [themeCompositor setArrow:[UIImage imageNamed:@"swipearrow.png"]];
-      [themeCompositor setComposition:_composition];
+    if ([_playerItem.customVideoCompositor isKindOfClass:[ThemeCompositor class]]) {
+      ThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
+      [themeCompositor setManifest:_composition];
+      [themeCompositor setManager:_manager];
     }
   }
+}
+
+- (CALayer *)createParentLayer:(CALayer *)videoLayer overlay:(CALayer *)overlayLayer
+{
+  CALayer *parentLayer = [CALayer layer];
+
+  parentLayer.drawsAsynchronously = NO;
+  parentLayer.frame = CGRectMake(0.0, 0.0, 720.0, 1280.0);
+  
+  videoLayer.frame = parentLayer.frame;
+  
+  [parentLayer addSublayer:videoLayer];
+  
+  return parentLayer;
 }
 
 - (void)setPaused:(BOOL)paused {
@@ -269,13 +270,14 @@ static NSString *const statusKeyPath = @"status";
   _exportSession.videoComposition = _manager.videoComposition;
   
   if (_exportSession.customVideoCompositor) {
-    if ([_exportSession.customVideoCompositor isKindOfClass:[CLPThemeCompositor class]]) {
-      CLPThemeCompositor *themeCompositor = (id)_exportSession.customVideoCompositor;
+    if ([_exportSession.customVideoCompositor isKindOfClass:[ThemeCompositor class]]) {
+      ThemeCompositor *themeCompositor = (id)_exportSession.customVideoCompositor;
       
-      [themeCompositor setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
-      [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
-      [themeCompositor setArrow:[UIImage imageNamed:@"swipearrow.png"]];
-      [themeCompositor setComposition:_composition];
+//      [themeCompositor setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
+//      [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
+//      [themeCompositor setArrow:[UIImage imageNamed:@"swipearrow.png"]];
+      [themeCompositor setManifest:_composition];
+      [themeCompositor setManager:_manager];
     }
   }
   
