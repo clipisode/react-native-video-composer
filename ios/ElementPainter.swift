@@ -5,11 +5,11 @@ import UIKit
 import CoreMedia
 import AVFoundation
 
-typealias Element = Dictionary<String, Any>
-typealias Props = Dictionary<String, Any>
+public typealias Element = Dictionary<String, Any>
+public typealias Props = Dictionary<String, Any>
 
 @objc
-class ElementPainter : NSObject {
+public class ElementPainter : NSObject {
   // We know we're working with kCVPixelFormatType_32BGRA
   private let COLOR_COMPONENT_COUNT: size_t = 4
   
@@ -19,7 +19,7 @@ class ElementPainter : NSObject {
   let manager: CompositionManager?
   
   @objc
-  init(context: CGContext, height: Int, manager: CompositionManager?) {
+  public init(context: CGContext, height: Int, manager: CompositionManager?) {
     self.context = context
     self.manager = manager
     
@@ -29,13 +29,13 @@ class ElementPainter : NSObject {
   }
   
   @objc
-  func drawBackground() {
+  public func drawBackground() {
     context.setFillColor(UIColor.black.cgColor)
     context.fill(CGRect(x: 0, y:0, width: context.width, height: context.height))
   }
   
   @objc
-  func drawElement(type: String, element: Element, props: Props, at: CMTime, compositionRequest: AVAsynchronousVideoCompositionRequest? = nil) {
+  public func drawElement(type: String, element: Element, props: Props, at: CMTime, compositionRequest: AVAsynchronousVideoCompositionRequest? = nil) {
     switch type {
     case "image":
       drawImage(props: props)
@@ -148,6 +148,8 @@ class ElementPainter : NSObject {
   }
   
   private func drawFrame(elementName: String, props: Props) {
+//    let startDF = DispatchTime.now()
+    
     let resizeMode = props["resizeMode"] as? String ?? "cover"
     let x = props["x"] as? Double ?? 0
     let y = props["y"] as? Double ?? 0
@@ -166,14 +168,14 @@ class ElementPainter : NSObject {
       ).applying(coordinateTransform)
       
       context.saveGState()
-      
+
       context.clip(to: rect)
       context.setAlpha(CGFloat(alpha))
       context.draw(frameImage, in: finalRect)
-//        calculateRectForResizeMode(sourceWidth: frameImage.width, sourceHeight: frameImage.height, resizeMode: resizeMode, target: rect)
-//      )
-      
+
       context.restoreGState()
+    } else {
+      print("No frame")
     }
   }
   

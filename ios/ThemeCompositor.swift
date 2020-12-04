@@ -6,51 +6,53 @@ import AVFoundation
 import UIKit
 
 @objc
-class ThemeCompositor : NSObject, AVVideoCompositing {
+public class ThemeCompositor : NSObject, AVVideoCompositing {
   @objc
-  var manifest: Dictionary<String, Any>? = nil
+  public var manifest: Dictionary<String, Any>? = nil
   
   @objc
-  var manager: CompositionManager? = nil
+  public var manager: CompositionManager? = nil
   
-  func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
+  public func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
     if (self.manifest == nil) {
-//      request.finish(with: nil)
+      request.finish(with: AVError(.videoCompositorFailed))
       return
     }
     
-    let manifest = self.manifest!
-    
-    if let destination = request.renderContext.newPixelBuffer() {
-      CVPixelBufferLockBaseAddress(destination, CVPixelBufferLockFlags(rawValue: 0))
+    DispatchQueue.global(qos: .userInitiated).async {
+      let manifest = self.manifest!
       
-      let destinationWidth: Int = CVPixelBufferGetWidth(destination)
-      let destinationHeight: Int = CVPixelBufferGetHeight(destination)
-      let colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB();
-      
-      let destinationBaseAddress: UnsafeMutableRawPointer? = CVPixelBufferGetBaseAddress(destination)
-      let bytesPerRow: size_t = CVPixelBufferGetBytesPerRow(destination)
-      let bitmapInfo: CGBitmapInfo = CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue)
-      
-      let context: CGContext? = CGContext(
-        data: destinationBaseAddress,
-        width: destinationWidth,
-        height: destinationHeight,
-        bitsPerComponent: 8,
-        bytesPerRow: bytesPerRow,
-        space: colorSpace,
-        bitmapInfo: bitmapInfo.rawValue
-      )
-      
-      if context != nil, manager != nil {
-        renderIntoContext(context!, manifest: manifest, manager: manager!, request: request)
+      if let destination = request.renderContext.newPixelBuffer() {
+        CVPixelBufferLockBaseAddress(destination, CVPixelBufferLockFlags(rawValue: 0))
+
+        let destinationWidth: Int = CVPixelBufferGetWidth(destination)
+        let destinationHeight: Int = CVPixelBufferGetHeight(destination)
+        let colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB();
+
+        let destinationBaseAddress: UnsafeMutableRawPointer? = CVPixelBufferGetBaseAddress(destination)
+        let bytesPerRow: size_t = CVPixelBufferGetBytesPerRow(destination)
+        let bitmapInfo: CGBitmapInfo = CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue)
+
+        let context: CGContext? = CGContext(
+          data: destinationBaseAddress,
+          width: destinationWidth,
+          height: destinationHeight,
+          bitsPerComponent: 8,
+          bytesPerRow: bytesPerRow,
+          space: colorSpace,
+          bitmapInfo: bitmapInfo.rawValue
+        )
+
+        if context != nil, self.manager != nil {
+          self.renderIntoContext(context!, manifest: manifest, manager: self.manager!, request: request)
+        }
+
+        CVPixelBufferUnlockBaseAddress(destination, CVPixelBufferLockFlags(rawValue: 0));
+
+        request.finish(withComposedVideoFrame: destination)
+      } else {
+        request.finish(with: AVError(.videoCompositorFailed))
       }
-      
-      CVPixelBufferUnlockBaseAddress(destination, CVPixelBufferLockFlags(rawValue: 0));
-      
-      request.finish(withComposedVideoFrame: destination)
-    } else {
-//      request.finish(with: nil)
     }
   }
   
@@ -75,43 +77,43 @@ class ThemeCompositor : NSObject, AVVideoCompositing {
   
   func renderIntoContext(_ context: CGContext, manifest: Dictionary<String, Any>, manager: CompositionManager, request: AVAsynchronousVideoCompositionRequest) {
     context.setAllowsAntialiasing(true)
-    
+
     UIGraphicsPushContext(context)
-    
+
     let painter = ElementPainter(context: context, height: 1280, manager: manager)
-    
+
     painter.drawBackground()
-    
+
     if let elements = manifest["elements"] as? Array<[String:Any]> {
       if let teaserVideoDurationConfig = manifest["teaserVideoDuration"] as? Double {
         let teaserVideoDuration = CMTimeSubtract(CMTime(seconds: teaserVideoDurationConfig, preferredTimescale: 1000), CMTime(value: 1, timescale: 30))
-        
+
         renderElements(elements, at: CMTimeMinimum(request.compositionTime, teaserVideoDuration), request: request, painter: painter)
       } else {
         renderElements(elements, at: request.compositionTime, request: request, painter: painter)
       }
     }
-    
+
     if let teaserElements = manifest["teaserElements"] as? Array<[String:Any]> {
       renderElements(teaserElements, at: request.compositionTime, request: request, painter: painter)
     }
-    
+
     UIGraphicsPopContext();
   }
   
-  func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
+  public func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
     
   }
   
-  func cancelAllPendingVideoCompositionRequests() {
+  public func cancelAllPendingVideoCompositionRequests() {
     
   }
   
-  var requiredPixelBufferAttributesForRenderContext: [String : Any] = [
+  public var requiredPixelBufferAttributesForRenderContext: [String : Any] = [
     String(kCVPixelBufferPixelFormatTypeKey): [kCVPixelFormatType_32BGRA]
   ]
   
-  var sourcePixelBufferAttributes: [String : Any]? = [
+  public var sourcePixelBufferAttributes: [String : Any]? = [
     String(kCVPixelBufferPixelFormatTypeKey): [kCVPixelFormatType_32BGRA]
   ]
 }

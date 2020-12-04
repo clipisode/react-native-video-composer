@@ -9,6 +9,9 @@
 @end
 
 @implementation CLPVideoUtil
+{
+  AVAssetExportSession *_exportSession;
+}
 
 RCT_EXPORT_MODULE()
 
@@ -68,6 +71,15 @@ RCT_EXPORT_METHOD(shareInstagramStory:(NSString *)videoFileUri
   });
 }
 
+RCT_EXPORT_METHOD(cancelTeaserExport:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+  if (_exportSession != nil) {
+    [_exportSession cancelExport];
+    
+    resolve(nil);
+  }
+}
+
 RCT_EXPORT_METHOD(exportTeaser:(NSString *)outputPath
                   manifest:(NSDictionary *)manifest
                   resolver:(RCTPromiseResolveBlock)resolve
@@ -90,31 +102,32 @@ RCT_EXPORT_METHOD(exportTeaser:(NSString *)outputPath
   
   CMTime preferredVideoDuration = CMTimeMakeWithSeconds([teaserVideoDurationConfig floatValue], 1000);
   // TODO: Get real original composition duration to use actual video duration in export session
-  //  CMTime actualVideoDuration = CMTimeMinimum(manager.composition.duration, preferredVideoDuration);
-  
+    
   CompositionManager *manager = [[CompositionManager alloc] initWithManifest:manifest minDuration:teaserDuration];
-
-  AVAssetExportSession *exportSession = [manager createTeaserExportSessionWithTeaserDuration:teaserDuration teaserVideoDuration:preferredVideoDuration];
   
-  exportSession.outputURL = [NSURL URLWithString:outputPath];
-  exportSession.outputFileType = AVFileTypeMPEG4;
-   
-  exportSession.videoComposition = manager.videoComposition;
-   
-  if (exportSession.customVideoCompositor) {
-    if ([exportSession.customVideoCompositor isKindOfClass:[ThemeCompositor class]]) {
-      ThemeCompositor *themeCompositor = (id)exportSession.customVideoCompositor;
-      
+  _exportSession = [manager createTeaserExportSessionWithTeaserDuration:teaserDuration teaserVideoDuration:preferredVideoDuration];
+
+  _exportSession.outputURL = [NSURL URLWithString:outputPath];
+  _exportSession.outputFileType = AVFileTypeMPEG4;
+
+  _exportSession.videoComposition = manager.videoComposition;
+
+  if (_exportSession.customVideoCompositor) {
+    if ([_exportSession.customVideoCompositor isKindOfClass:[ThemeCompositor class]]) {
+      ThemeCompositor *themeCompositor = (id)_exportSession.customVideoCompositor;
+
       [themeCompositor setManifest:manifest];
       [themeCompositor setManager:manager];
     }
   }
-  
-  [exportSession exportAsynchronouslyWithCompletionHandler:^{
-    if (exportSession.status == AVAssetExportSessionStatusCompleted) {
+
+  [_exportSession exportAsynchronouslyWithCompletionHandler:^{
+    if (self->_exportSession.status == AVAssetExportSessionStatusCompleted) {
       resolve(nil);
-    } else if (exportSession.status == AVAssetExportSessionStatusFailed) {
-      reject(@"Unknown", @"Unknown", exportSession.error);
+    } else if (self->_exportSession.status == AVAssetExportSessionStatusFailed) {
+      reject(@"Unknown", @"Unknown", self->_exportSession.error);
+    } else if (self->_exportSession.status == AVAssetExportSessionStatusCancelled) {
+      reject(@"Cancelled", @"The export was cancelled.", nil);
     } else {
       reject(@"Unknown", @"Unknown", nil);
     }
@@ -145,7 +158,7 @@ RCT_EXPORT_METHOD(generateSticker:(NSString *)outputPath
   
   CGContextRef context = CGBitmapContextCreate(data, [stickerWidth intValue], [stickerHeight intValue], bitsPerComponent, bytesPerRow, colorSpace, bitmapInfo);
   UIGraphicsPushContext(context);
-  
+
 
   ElementPainter *painter = [[ElementPainter alloc] initWithContext:context
                                                              height:[stickerHeight longValue]
@@ -153,26 +166,26 @@ RCT_EXPORT_METHOD(generateSticker:(NSString *)outputPath
 
   if (composition != nil) {
     NSArray *elements = composition[@"elements"];
-    
+
     for (NSDictionary* element in elements) {
       NSString *type = (NSString *)element[@"type"];
       NSDictionary *props = (NSDictionary *)element[@"props"];
-      
+
       [painter drawElementWithType:type element:element props:props at:kCMTimeZero compositionRequest:nil];
     }
   }
   UIGraphicsPopContext();
-  
+
   CGImageRef bitmapImage = CGBitmapContextCreateImage(context);
   UIImage *image = [UIImage imageWithCGImage:bitmapImage];
   CGImageRelease(bitmapImage);
 
   NSData *imageData = UIImagePNGRepresentation(image);
   BOOL success = [imageData writeToFile:outputPath atomically:NO];
-  
+
   CGColorSpaceRelease(colorSpace);
   CGContextRelease(context);
-  
+
   if (success) {
     resolve(NULL);
   } else {

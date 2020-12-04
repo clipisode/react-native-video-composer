@@ -4,19 +4,19 @@ import CoreMedia
 import UIKit
 
 @objc
-class CompositionManager : NSObject {
+public class CompositionManager : NSObject {
   private let manifest: Dictionary<String, Any>
   private let assetLoader: AssetLoader
   
-  @objc private(set) var composition: AVComposition?
-  @objc private(set) var videoComposition: AVVideoComposition?
-  @objc private(set) var quietAudioTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
+  @objc public private(set) var composition: AVComposition?
+  @objc public  private(set) var videoComposition: AVVideoComposition?
+  @objc public  private(set) var quietAudioTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
   
   private var videoTrackIdMap: [String:CMPersistentTrackID] = [:]
   private var frameMap: [String:CGImage] = [:]
 
   @objc
-  init(manifest: [String:Any], minDuration: CMTime = .invalid) {
+  public init(manifest: [String:Any], minDuration: CMTime = .invalid) {
     self.manifest = manifest
     self.assetLoader = AssetLoader()
     
@@ -54,13 +54,13 @@ class CompositionManager : NSObject {
     imageGenerator.appliesPreferredTrackTransform = true
     imageGenerator.requestedTimeToleranceAfter = .zero
     imageGenerator.requestedTimeToleranceBefore = .zero
-    
+
     do {
       var actualTime: CMTime = .invalid
       let copiedImage = try imageGenerator.copyCGImage(at: at, actualTime: &actualTime)
-      
+
       print("Requested \(at) but got \(actualTime)")
-      
+
       return copiedImage
     } catch {
       print("Unexpected error: \(error).")
@@ -115,7 +115,7 @@ class CompositionManager : NSObject {
   }
   
   @objc
-  func createTeaserExportSession(teaserDuration: CMTime, teaserVideoDuration: CMTime) -> AVAssetExportSession? {
+  public func createTeaserExportSession(teaserDuration: CMTime, teaserVideoDuration: CMTime) -> AVAssetExportSession? {
     if let composition = composition {
       let audioMix = AVMutableAudioMix()
       var params: [AVMutableAudioMixInputParameters] = []

@@ -163,35 +163,35 @@ static NSString *const statusKeyPath = @"status";
 - (void)setComposition:(NSDictionary *)composition
 {
   _composition = composition;
-  
+
   if (_manager == nil) {
     _manager = [[CompositionManager alloc] initWithManifest:composition minDuration:kCMTimeInvalid];
-  
+
     AVComposition *avcomp = _manager.composition;
-  
+
     _playerItem = [AVPlayerItem playerItemWithAsset:avcomp];
-    
+
     _player = [AVPlayer playerWithPlayerItem:_playerItem];
     _player.actionAtItemEnd = AVPlayerActionAtItemEndPause;
     _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
-    
+
     [self addPlayerItemObservers];
-    
+
     _playerLayer.needsDisplayOnBoundsChange = YES;
     _playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    
+
     _syncLayer = [AVSynchronizedLayer synchronizedLayerWithPlayerItem:_playerItem];
     [self.layer addSublayer:_syncLayer];
-    
+
     [self addPlayerTimeObserver];
-    
+
     CALayer *parentLayer = [self createParentLayer:_playerLayer overlay:[CALayer layer]];
-    
+
     [_syncLayer addSublayer:parentLayer];
   }
-  
+
   _playerItem.videoComposition = _manager.videoComposition;
-  
+
   if (_playerItem.customVideoCompositor) {
     if ([_playerItem.customVideoCompositor isKindOfClass:[ThemeCompositor class]]) {
       ThemeCompositor *themeCompositor = (id)_playerItem.customVideoCompositor;
@@ -273,9 +273,6 @@ static NSString *const statusKeyPath = @"status";
     if ([_exportSession.customVideoCompositor isKindOfClass:[ThemeCompositor class]]) {
       ThemeCompositor *themeCompositor = (id)_exportSession.customVideoCompositor;
       
-//      [themeCompositor setIcon:[UIImage imageNamed:@"iconfortheme.png"]];
-//      [themeCompositor setLogo:[UIImage imageNamed:@"logofortheme.png"]];
-//      [themeCompositor setArrow:[UIImage imageNamed:@"swipearrow.png"]];
       [themeCompositor setManifest:_composition];
       [themeCompositor setManager:_manager];
     }
