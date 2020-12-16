@@ -329,6 +329,7 @@ public class ElementPainter : NSObject {
     let fontSize = props["fontSize"] as? Double ?? 44
     let color = props["color"] as? String ?? "#FFFFFF"
     let textAlign = props["textAlign"] as? String ?? "left"
+    var lineHeight = props["lineHeight"] as? Double ?? fontSize * 1.4
     let originY = props["originY"] as? String ?? "top"
     let x = props["x"] as? Double ?? 0.0
     var y = props["y"] as? Double ?? 0.0
@@ -355,9 +356,11 @@ public class ElementPainter : NSObject {
     default:
       alignment = .left
     }
-    
+
     let styleSettings: [CTParagraphStyleSetting] = [
-      .init(spec: .alignment, valueSize: MemoryLayout<CTTextAlignment>.size, value: &alignment)
+      CTParagraphStyleSetting(spec: .minimumLineHeight, valueSize: MemoryLayout<CGFloat>.size, value: &lineHeight),
+      CTParagraphStyleSetting(spec: .maximumLineHeight, valueSize: MemoryLayout<CGFloat>.size, value: &lineHeight),
+      CTParagraphStyleSetting(spec: .alignment, valueSize: MemoryLayout<CTTextAlignment>.size, value: &alignment)
     ]
     let paragraphStyle = CTParagraphStyleCreate(styleSettings, styleSettings.count)
 
