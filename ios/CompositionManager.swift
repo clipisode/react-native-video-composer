@@ -204,20 +204,25 @@ public class CompositionManager : NSObject {
         let asset: AVAsset = assetLoader.load(key: key, filePath: path)
         
         let startAt = element["startAt"] as? Double ?? 0
+        let endAt = element["endAt"] as? Double ?? 0
         
         let startAtTime = CMTimeMake(value: Int64(startAt * 1000), timescale: 1000)
         
         if let firstVideoTrack = asset.tracks(withMediaType: AVMediaType.video).first {
+          let endAtTime = CMTimeSubtract(CMTimeMake(value: Int64(endAt * 1000), timescale: 1000), startAtTime)
+          let videoDuration = endAt == 0 ? firstVideoTrack.timeRange.duration : endAtTime
+          
           if let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
-            // store the track ID in the name->trackID map for use by the compositor
+            // store the track ID 3in the name->trackID map for use by the compositor
             if let name = element["name"] as? String {
               videoTrackIdMap[name] = videoTrack.trackID
             }
             
-            try? videoTrack.insertTimeRange(firstVideoTrack.timeRange, of: firstVideoTrack, at: startAtTime)
+            try? videoTrack.insertTimeRange(CMTimeRange(start: .zero, duration: videoDuration), of: firstVideoTrack, at: startAtTime)
             
             let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: videoTrack)
             layerInstruction.setTransform(firstVideoTrack.preferredTransform, at: startAtTime)
+            // This is necessary to extend the last frame of the video out to the end
             if let dur = extendTo {
               layerInstruction.setOpacity(0, at: dur)
             }
@@ -226,8 +231,13 @@ public class CompositionManager : NSObject {
         }
         
         if let firstAudioTrack = asset.tracks(withMediaType: AVMediaType.audio).first {
+          let audioDuration = endAt == 0 ? firstAudioTrack.timeRange.duration : CMTimeSubtract(CMTimeMake(value: Int64(endAt * 1000), timescale: 1000), startAtTime)
           if let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-            try? audioTrack.insertTimeRange(firstAudioTrack.timeRange, of: firstAudioTrack, at: startAtTime)
+            try? audioTrack.insertTimeRange(
+              CMTimeRange(start: .zero, duration: audioDuration),
+              of: firstAudioTrack,
+              at: CMTimeAdd(startAtTime, CMTime(value: 1, timescale: 30))
+            )
           }
         }
       }
@@ -244,6 +254,17 @@ public class CompositionManager : NSObject {
     
     videoComposition.instructions = [videoCompositionInstruction];
     videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+    
+//    for track in composition.tracks {
+//      print(track.mediaType)
+//      print(track.timeRange)
+//
+//      for seg in track.segments {
+//        print("**  \(seg.timeMapping.source)")
+//        print("**  \(seg.timeMapping.target)")
+//      }
+//      print("--------------")
+//    }
   }
   
   // predicate for filtering the elements list
