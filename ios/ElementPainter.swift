@@ -64,10 +64,12 @@ public class ElementPainter : NSObject {
     let y = props["y"] as? Double ?? 0
     let width = props["width"] as? Double ?? 0
     let height = props["height"] as? Double ?? 0
+
+    print(request.compositionTime)
     
     if let manager = self.manager, let trackId = manager.videoTrackId(elementName: elementName)  {
       let requestedFrame = request.sourceFrame(byTrackID: trackId)
-      
+
       if let sourceFrame = requestedFrame {
         CVPixelBufferLockBaseAddress(sourceFrame, .readOnly)
         var sourceFrameImage = CIImage(cvPixelBuffer: sourceFrame)
@@ -232,7 +234,6 @@ public class ElementPainter : NSObject {
       context.draw(image!.cgImage!, in: rect)
       
       context.restoreGState()
-      
     }
   }
   
@@ -250,8 +251,9 @@ public class ElementPainter : NSObject {
     let rectBezierPath = UIBezierPath(roundedRect: rect, cornerRadius: floatRadius)
     let fillColor = ColorHelper.getUIColorObjectFromHexString(color: color, alpha: alpha)
     
-    fillColor.setFill()
-    rectBezierPath.fill()
+    context.setFillColor(fillColor.cgColor)
+    context.addPath(rectBezierPath.cgPath)
+    context.fillPath()
     
     if (strokeWidth > 0) {
       let uiStrokeWidth = CGFloat(strokeWidth)
@@ -270,15 +272,18 @@ public class ElementPainter : NSObject {
       
       let strokeColor = ColorHelper.getUIColorObjectFromHexString(color: strokeColor, alpha: strokeAlpha)
       
-      strokeColor.setStroke()
-      strokeRectBezierPath.lineWidth = uiStrokeWidth
-      
-      strokeRectBezierPath.stroke()
+      context.setStrokeColor(strokeColor.cgColor)
+      context.setLineWidth(uiStrokeWidth)
+      context.addPath(strokeRectBezierPath.cgPath)
+      context.strokePath()
     }
   }
   
   private func drawGradient(props: Props) {
     let alpha = props["alpha"] as? Double ?? 1.0
+    let rVal = props["rVal"] as? Double ?? 52.0
+    let gVal = props["gVal"] as? Double ?? 152.0
+    let bVal = props["bVal"] as? Double ?? 219.0
     
     // TODO: 👆 alpha is the only supported prop right now to support fading in/out.
     // This needs to be updated to support colors, locations, and path.
@@ -288,7 +293,7 @@ public class ElementPainter : NSObject {
     
     let numberOfLocations = 3
     
-    let baseColor = UIColor(red: 52.0/255.0, green: 152.0/255.0, blue: 219.0/255.0, alpha: 1)
+    let baseColor = UIColor(red: CGFloat(rVal)/255.0, green: CGFloat(gVal)/255.0, blue: CGFloat(bVal)/255.0, alpha: 1)
     
     let colorOne = baseColor.withAlphaComponent(0.0).cgColor
     let colorTwo = baseColor.withAlphaComponent(0.8).cgColor

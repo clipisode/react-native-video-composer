@@ -12,46 +12,50 @@ public class ThemeCompositor : NSObject, AVVideoCompositing {
   
   @objc
   public var manager: CompositionManager? = nil
+
+  private var renderingQueue = DispatchQueue(label: "com.clipisode.themecompositor.renderingqueue", qos: .userInitiated)
   
   public func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
-    if (self.manifest == nil) {
-      request.finish(with: AVError(.videoCompositorFailed))
-      return
-    }
-    
-    DispatchQueue.global(qos: .userInitiated).async {
-      let manifest = self.manifest!
-      
-      if let destination = request.renderContext.newPixelBuffer() {
-        CVPixelBufferLockBaseAddress(destination, CVPixelBufferLockFlags(rawValue: 0))
-
-        let destinationWidth: Int = CVPixelBufferGetWidth(destination)
-        let destinationHeight: Int = CVPixelBufferGetHeight(destination)
-        let colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB();
-
-        let destinationBaseAddress: UnsafeMutableRawPointer? = CVPixelBufferGetBaseAddress(destination)
-        let bytesPerRow: size_t = CVPixelBufferGetBytesPerRow(destination)
-        let bitmapInfo: CGBitmapInfo = CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue)
-
-        let context: CGContext? = CGContext(
-          data: destinationBaseAddress,
-          width: destinationWidth,
-          height: destinationHeight,
-          bitsPerComponent: 8,
-          bytesPerRow: bytesPerRow,
-          space: colorSpace,
-          bitmapInfo: bitmapInfo.rawValue
-        )
-
-        if context != nil, self.manager != nil {
-          self.renderIntoContext(context!, manifest: manifest, manager: self.manager!, request: request)
+    autoreleasepool {
+      renderingQueue.async {
+        if (self.manifest == nil) {
+          request.finish(with: AVError(.videoCompositorFailed))
+          return
         }
+        
+        let manifest = self.manifest!
+        
+        if let destination = request.renderContext.newPixelBuffer() {
+          CVPixelBufferLockBaseAddress(destination, CVPixelBufferLockFlags(rawValue: 0))
+        
+          let destinationWidth: Int = CVPixelBufferGetWidth(destination)
+          let destinationHeight: Int = CVPixelBufferGetHeight(destination)
+          let colorSpace: CGColorSpace = CGColorSpaceCreateDeviceRGB();
 
-        CVPixelBufferUnlockBaseAddress(destination, CVPixelBufferLockFlags(rawValue: 0));
+          let destinationBaseAddress: UnsafeMutableRawPointer? = CVPixelBufferGetBaseAddress(destination)
+          let bytesPerRow: size_t = CVPixelBufferGetBytesPerRow(destination)
+          let bitmapInfo: CGBitmapInfo = CGBitmapInfo(rawValue: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue)
 
-        request.finish(withComposedVideoFrame: destination)
-      } else {
-        request.finish(with: AVError(.videoCompositorFailed))
+          let context: CGContext? = CGContext(
+            data: destinationBaseAddress,
+            width: destinationWidth,
+            height: destinationHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo.rawValue
+          )
+
+          if let renderContext = context, let renderManager = self.manager {
+            self.renderIntoContext(renderContext, manifest: manifest, manager: renderManager, request: request)
+          }
+
+          CVPixelBufferUnlockBaseAddress(destination, CVPixelBufferLockFlags(rawValue: 0));
+
+          request.finish(withComposedVideoFrame: destination)
+        } else {
+          request.finish(with: AVError(.videoCompositorFailed))
+        }
       }
     }
   }
@@ -78,7 +82,7 @@ public class ThemeCompositor : NSObject, AVVideoCompositing {
   func renderIntoContext(_ context: CGContext, manifest: Dictionary<String, Any>, manager: CompositionManager, request: AVAsynchronousVideoCompositionRequest) {
     context.setAllowsAntialiasing(true)
 
-    UIGraphicsPushContext(context)
+//    UIGraphicsPushContext(context)
 
     let painter = ElementPainter(context: context, height: 1280, manager: manager)
 
@@ -98,7 +102,7 @@ public class ThemeCompositor : NSObject, AVVideoCompositing {
       renderElements(teaserElements, at: request.compositionTime, request: request, painter: painter)
     }
 
-    UIGraphicsPopContext();
+//    UIGraphicsPopContext();
   }
   
   public func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {
