@@ -289,6 +289,8 @@ static NSString *const statusKeyPath = @"status";
               self.onExportProgress(@{@"progress": [NSNumber numberWithFloat:self->_exportSession.progress]});
             } else if (self->_exportSession.status == AVAssetExportSessionStatusCompleted) {
               [timer invalidate];
+            } else if (self->_exportSession.status == AVAssetExportSessionStatusCancelled) {
+              [timer invalidate];
             }
           }
         }];
@@ -311,6 +313,7 @@ static NSString *const statusKeyPath = @"status";
         });
       } else if (self->_exportSession.status == AVAssetExportSessionStatusCancelled) {
         self->_exportSession = nil;
+        reject(@"ExportError", @"Cancelled", nil);
       }
     }];
   } else {
