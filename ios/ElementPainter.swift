@@ -195,6 +195,10 @@ public class ElementPainter : NSObject {
       image = UIImage(named: "iconfortheme.png")
     case "arrow":
       image = UIImage(named: "swipearrow.png")
+    case "logoRT":
+      image = UIImage(named: "rushtix-logo.png")
+    case "iconRT":
+      image = UIImage(named: "rushtix-icon.png")
     default:
       image = nil
     }
