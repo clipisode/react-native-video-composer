@@ -24,7 +24,24 @@ class AssetLoader : NSObject {
       )
       assets[key] = asset;
     }
+
+    let composition = AVMutableComposition()
+    let compositionVideoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: CMPersistentTrackID(kCMPersistentTrackID_Invalid))
+    let compositionAudioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID:  CMPersistentTrackID(kCMPersistentTrackID_Invalid))
+
+    if let a = asset {
+      let sourceVideoTrack = a.tracks(withMediaType: .video).first!
+      let sourceAudioTrack = a.tracks(withMediaType: .audio).first!
     
-    return asset!;
+      compositionVideoTrack?.preferredTransform = sourceVideoTrack.preferredTransform
+
+      do {
+        try compositionVideoTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: a.duration), of: sourceVideoTrack, at: .zero)
+        try compositionAudioTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: a.duration), of: sourceAudioTrack, at: .zero)
+      } catch(_) {
+      }
+    }
+
+    return composition;
   }
 }
