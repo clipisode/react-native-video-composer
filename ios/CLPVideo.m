@@ -54,6 +54,8 @@ static NSString *const statusKeyPath = @"status";
 
 - (void)removeFromSuperview
 {
+  [self cancelExport];
+
   if (_playerLayer.player != nil) {
     [_playerLayer.player pause];
     _playerLayer.player = nil;

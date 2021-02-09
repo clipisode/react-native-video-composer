@@ -65,8 +65,6 @@ public class ElementPainter : NSObject {
     let width = props["width"] as? Double ?? 0
     let height = props["height"] as? Double ?? 0
 
-    print(request.compositionTime)
-    
     if let manager = self.manager, let trackId = manager.videoTrackId(elementName: elementName)  {
       let requestedFrame = request.sourceFrame(byTrackID: trackId)
 
@@ -74,7 +72,7 @@ public class ElementPainter : NSObject {
         CVPixelBufferLockBaseAddress(sourceFrame, .readOnly)
         var sourceFrameImage = CIImage(cvPixelBuffer: sourceFrame)
         CVPixelBufferUnlockBaseAddress(sourceFrame, .readOnly)
-        
+
         // ------- preferred transform ----------
         
         if let mainInstruction = request.videoCompositionInstruction as? AVVideoCompositionInstruction {
