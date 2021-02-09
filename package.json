@@ -1,6 +1,6 @@
 {
   "name": "@clipisode/react-native-video-composer",
-  "version": "1.24.1",
+  "version": "1.24.2",
   "description": "Compose underlay videos for Answers RN.",
   "main": "lib/index.js",
   "scripts": {
