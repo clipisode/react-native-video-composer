@@ -98,7 +98,7 @@ public class ElementPainter : NSObject {
         // --------------------------------------
         
         let coreImageContext = CIContext(cgContext: context, options: nil)
-//        sourceFrameImage = sourceFrameImage.applyingFilter("CIPhotoEffectTonal", parameters: [:])
+        
         if let sourceFrameCGImage = coreImageContext.createCGImage(sourceFrameImage, from: sourceFrameImage.extent) {
           let finalRect = calculateRectForResizeMode(
             sourceWidth: Double(sourceFrameCGImage.width),
@@ -318,7 +318,7 @@ public class ElementPainter : NSObject {
 
     let myStartPoint: CGPoint = CGPoint(x: 0.0, y: 1280.0 - height).applying(coordinateTransform)
     let myEndPoint: CGPoint = CGPoint(x: 0.0, y: 1280.0).applying(coordinateTransform)
-    
+
     context.saveGState()
     
     context.clip(to: CGRect(x: 0, y: 1280 - height, width: 720, height: 1280).applying(coordinateTransform))

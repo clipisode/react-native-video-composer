@@ -38,7 +38,7 @@ class AssetLoader : NSObject {
       do {
         try compositionVideoTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: a.duration), of: sourceVideoTrack, at: .zero)
         try compositionAudioTrack?.insertTimeRange(CMTimeRange(start: .zero, duration: a.duration), of: sourceAudioTrack, at: .zero)
-      } catch(_) {
+      } catch {
       }
     }
 

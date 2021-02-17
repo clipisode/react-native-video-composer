@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import CoreMedia
 import UIKit
+import CoreGraphics
 
 @objc
 public class CompositionManager : NSObject {
@@ -9,8 +10,8 @@ public class CompositionManager : NSObject {
   private let assetLoader: AssetLoader
   
   @objc public private(set) var composition: AVComposition?
-  @objc public  private(set) var videoComposition: AVVideoComposition?
-  @objc public  private(set) var quietAudioTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
+  @objc public private(set) var videoComposition: AVVideoComposition?
+  @objc public private(set) var quietAudioTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
   
   private var videoTrackIdMap: [String:CMPersistentTrackID] = [:]
   private var frameMap: [String:CGImage] = [:]
@@ -59,7 +60,9 @@ public class CompositionManager : NSObject {
       var actualTime: CMTime = .invalid
       let copiedImage = try imageGenerator.copyCGImage(at: at, actualTime: &actualTime)
 
-      print("Requested \(at) but got \(actualTime)")
+      if CMTimeCompare(at, actualTime) != 0 {
+        print("Requested \(at) but got \(actualTime)")
+      }
 
       return copiedImage
     } catch {
@@ -81,8 +84,12 @@ public class CompositionManager : NSObject {
     if let asset = assetByKey(videoKey: videoKey) {
       if position == "first" {
         return assetFrameAtTime(asset: asset, at: .zero)
-      } else if position == "last", let end = asset.tracks(withMediaType: .video).first?.timeRange.end {
-        return assetFrameAtTime(asset: asset, at: end)
+      } else if position == "last" {
+        if #available(iOS 10.2, *) {
+          return assetFrameAtTime(asset: asset, at: asset.overallDurationHint)
+        } else {
+          return assetFrameAtTime(asset: asset, at: asset.duration)
+        }
       }
     }
     

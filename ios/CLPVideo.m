@@ -23,6 +23,7 @@
   AVAssetExportSession *_exportSession;
   CompositionManager *_manager;
   AVSynchronizedLayer *_syncLayer;
+  id _memoryPressureNotificationSubscription;
   
   id _timeObserver;
   
@@ -63,7 +64,17 @@ static NSString *const statusKeyPath = @"status";
   
   [_playerLayer removeFromSuperlayer];
   [self removePlayerItemObservers];
+  [self removePlayerTimeObserver];
   _playerLayer = nil;
+  _composition = nil;
+  _manager = nil;
+  _syncLayer = nil;
+  _exportSession = nil;
+  _playerItem = nil;
+  
+  if (_memoryPressureNotificationSubscription) {
+    [[NSNotificationCenter defaultCenter] removeObserver:_memoryPressureNotificationSubscription];
+  }
   
   [super removeFromSuperview];
 }
@@ -256,6 +267,10 @@ static NSString *const statusKeyPath = @"status";
   [_player setRate:rate];
 }
 
+- (void)dealloc {
+  _memoryPressureNotificationSubscription = nil;
+}
+
 - (void)cancelExport {
   if (self->_exportSession != nil) {
     [self->_exportSession cancelExport];
@@ -265,6 +280,13 @@ static NSString *const statusKeyPath = @"status";
 - (void)save:(NSString *)outPath resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject
 {
   _exportSession = [AVAssetExportSession exportSessionWithAsset:_manager.composition presetName:AVAssetExportPreset1280x720];
+  
+  __weak AVAssetExportSession *weakExportSession = _exportSession;
+  _memoryPressureNotificationSubscription = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidReceiveMemoryWarningNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+    if (weakExportSession != nil) {
+      [weakExportSession cancelExport];
+    }
+  }];
 
   _exportSession.outputURL = [NSURL URLWithString:outPath];
   _exportSession.outputFileType = AVFileTypeMPEG4;
@@ -282,23 +304,22 @@ static NSString *const statusKeyPath = @"status";
   
   if (_manager.composition.isExportable) {
     if (self.onExportProgress) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        [NSTimer scheduledTimerWithTimeInterval:0.1 repeats:YES block:^(NSTimer * _Nonnull timer) {
-          if (self->_exportSession == nil) {
-            [timer invalidate];
-          } else {
-            if (self->_exportSession.status == AVAssetExportSessionStatusExporting) {
+      [NSTimer scheduledTimerWithTimeInterval:0.25 repeats:YES block:^(NSTimer * _Nonnull timer) {
+        if (self->_exportSession == nil) {
+          [timer invalidate];
+        } else {
+          if (self->_exportSession.status == AVAssetExportSessionStatusExporting) {
+            dispatch_async(dispatch_get_main_queue(), ^{
               self.onExportProgress(@{@"progress": [NSNumber numberWithFloat:self->_exportSession.progress]});
-            } else if (self->_exportSession.status == AVAssetExportSessionStatusCompleted) {
-              [timer invalidate];
-            } else if (self->_exportSession.status == AVAssetExportSessionStatusCancelled) {
-              [timer invalidate];
-            }
+            });
+          } else if (self->_exportSession.status == AVAssetExportSessionStatusCompleted) {
+            [timer invalidate];
+          } else if (self->_exportSession.status == AVAssetExportSessionStatusCancelled) {
+            [timer invalidate];
           }
-        }];
-      });
+        }
+      }];
     }
-    
     
     [_exportSession exportAsynchronouslyWithCompletionHandler:^{
       if (self->_exportSession.status == AVAssetExportSessionStatusCompleted) {

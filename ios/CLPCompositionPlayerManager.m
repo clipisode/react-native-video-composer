@@ -10,11 +10,10 @@
 
 RCT_EXPORT_MODULE()
 
+
 - (UIView *)view
 {
-  CLPVideo *video = [[CLPVideo alloc] init];
-  
-  return video;
+  return [[CLPVideo alloc] init];
 }
 
 RCT_EXPORT_VIEW_PROPERTY(composition, NSDictionary);
@@ -52,6 +51,11 @@ RCT_EXPORT_METHOD(cancelExport:(nonnull NSNumber *)reactTag
         resolve(nil);
       }
   }];
+}
+
++ (BOOL)requiresMainQueueSetup
+{
+    return YES;
 }
 
 @end
