@@ -87,7 +87,7 @@ public class ThemeCompositor : NSObject, AVVideoCompositing {
   func renderIntoContext(_ context: CGContext, manifest: Dictionary<String, Any>, manager: CompositionManager, request: AVAsynchronousVideoCompositionRequest) {
     context.setAllowsAntialiasing(true)
 
-    let painter = ElementPainter(context: context, height: 1280, manager: manager)
+    let painter = ElementPainter(context: context, height: 1280, manager: manager, files: manifest["files"] as! Dictionary<String, String>)
 
     painter.drawBackground()
 

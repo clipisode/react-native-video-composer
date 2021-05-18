@@ -17,11 +17,13 @@ public class ElementPainter : NSObject {
 
   let context: CGContext
   let manager: CompositionManager?
+  let files: Dictionary<String, String>
   
   @objc
-  public init(context: CGContext, height: Int, manager: CompositionManager?) {
+  public init(context: CGContext, height: Int, manager: CompositionManager?, files: Dictionary<String, String>) {
     self.context = context
     self.manager = manager
+    self.files = files
     
     coordinateTransform = CGAffineTransform.identity
       .translatedBy(x: 0, y: CGFloat(height))
@@ -188,19 +190,8 @@ public class ElementPainter : NSObject {
     
     var image: UIImage? = nil
     
-    switch key {
-    case "logo":
-      image = UIImage(named: "logofortheme.png")
-    case "icon":
-      image = UIImage(named: "iconfortheme.png")
-    case "arrow":
-      image = UIImage(named: "swipearrow.png")
-    case "logoRT":
-      image = UIImage(named: "rushtix-logo.png")
-    case "iconRT":
-      image = UIImage(named: "rushtix-icon.png")
-    default:
-      image = nil
+    if let filePath = self.files[key] {
+      image = UIImage(contentsOfFile: filePath)
     }
     
     imageCache[key] = image
@@ -218,10 +209,6 @@ public class ElementPainter : NSObject {
     if let imageKey = props["imageKey"] as? String {
       image = imageByKey(imageKey)
     }
-    
-    // TODO: 👆 'icon', 'logo' and 'arrow' are provided by the app bundle.
-    // This is where we'll add support for other images provided by
-    // the theme and downloaded by the application at runtime.
     
     if (image == nil) {
       print("Image not found for key: '\(imageKey ?? "{nil}")'");

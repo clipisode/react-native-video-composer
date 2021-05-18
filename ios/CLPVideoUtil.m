@@ -162,7 +162,8 @@ RCT_EXPORT_METHOD(generateSticker:(NSString *)outputPath
 
   ElementPainter *painter = [[ElementPainter alloc] initWithContext:context
                                                              height:[stickerHeight longValue]
-                                                            manager:nil];
+                                                            manager:nil
+                                                              files:@{}];
 
   if (composition != nil) {
     NSArray *elements = composition[@"elements"];
