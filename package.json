@@ -17,7 +17,7 @@
   },
   "license": "UNLICENSED",
   "devDependencies": {
-    "react-native": "^0.61.4",
+    "react-native": "^0.62.3",
     "typescript": "^3.8.3",
     "@types/react-native": "^0.61.21"
   }
