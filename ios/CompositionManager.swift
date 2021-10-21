@@ -85,11 +85,9 @@ public class CompositionManager : NSObject {
       if position == "first" {
         return assetFrameAtTime(asset: asset, at: .zero)
       } else if position == "last" {
-        if #available(iOS 10.2, *) {
-          return assetFrameAtTime(asset: asset, at: asset.overallDurationHint)
-        } else {
-          return assetFrameAtTime(asset: asset, at: asset.duration)
-        }
+        let minFrameDuration = asset.tracks(withMediaType: .video).first?.minFrameDuration ?? CMTime(value: 1, timescale: 30)
+        
+        return assetFrameAtTime(asset: asset, at: asset.duration - minFrameDuration)
       }
     }
     
